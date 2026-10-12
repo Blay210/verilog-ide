@@ -1,0 +1,139 @@
+{
+  "name": "rtl-language",
+  "publisher": "rtl-internal",
+  "displayName": "RTL Language (Built-in)",
+  "description": "Product-owned Verilog and SystemVerilog lexical editing",
+  "version": "0.0.0",
+  "license": "MIT",
+  "engines": {
+    "vscode": "*"
+  },
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onLanguage:verilog",
+    "onLanguage:systemverilog"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "verilog",
+        "extensions": [
+          ".v",
+          ".vh"
+        ],
+        "aliases": [
+          "Verilog"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/verilog-light.svg",
+          "dark": "./icons/verilog-dark.svg"
+        }
+      },
+      {
+        "id": "systemverilog",
+        "extensions": [
+          ".sv",
+          ".svh"
+        ],
+        "aliases": [
+          "SystemVerilog"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/systemverilog-light.svg",
+          "dark": "./icons/systemverilog-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "verilog",
+        "scopeName": "source.verilog",
+        "path": "./syntaxes/verilog.tmLanguage.json"
+      },
+      {
+        "language": "systemverilog",
+        "scopeName": "source.systemverilog",
+        "path": "./syntaxes/systemverilog.tmLanguage.json"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "rtl.insertNewline",
+        "key": "enter",
+        "when": "editorTextFocus && !editorReadonly && (!suggestWidgetVisible || rtl.blockEnter) && (!inSnippetMode || rtl.beginPair) && !editorHasMultipleSelections && config.rtl.editor.autoCloseBlocks && (editorLangId == verilog || editorLangId == systemverilog)"
+      },
+      {
+        "command": "rtl.expandTemplate",
+        "key": "tab",
+        "when": "editorTextFocus && !editorReadonly && !editorTabMovesFocus && !inSnippetMode && !inlineSuggestionVisible && !editorHasMultipleSelections && rtl.templateTab && config.rtl.editor.templates && (editorLangId == verilog || editorLangId == systemverilog)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "rtl.expandTemplate",
+        "title": "RTL: Expand Template"
+      },
+      {
+        "command": "rtl.insertNewline",
+        "title": "RTL: Insert Block Newline"
+      },
+      {
+        "command": "rtl.restartLanguage",
+        "title": "RTL: Retry Analysis"
+      },
+      {
+        "command": "rtl.languageStatus",
+        "title": "RTL: Language Status"
+      },
+      {
+        "command": "rtl.setupTools",
+        "title": "RTL: Set Up Tools"
+      },
+      {
+        "command": "rtl.setupLanguage",
+        "title": "RTL: Set Up Language Tools"
+      }
+    ],
+    "configuration": {
+      "title": "RTL Editing",
+      "properties": {
+        "rtl.editor.autoCloseBlocks": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "On Enter after begin or case (...), indent the body and insert a missing end/endcase."
+        },
+        "rtl.editor.basicCompletions": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Suggest RTL keywords, gate primitives and common system tasks/functions."
+        },
+        "rtl.editor.templates": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Expand explicit RTL block keywords with Tab and offer templates with tab stops."
+        },
+        "rtl.editor.semantic": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Enable slang module/port/scope intelligence and RTL diagnostics in trusted workspaces."
+        },
+        "rtl.toolsDirectory": {
+          "type": "string",
+          "scope": "window",
+          "description": "Shared tool storage outside user projects. Existing tools are verified before reuse."
+        }
+      }
+    }
+  }
+}

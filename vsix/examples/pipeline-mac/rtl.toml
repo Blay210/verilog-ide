@@ -1,0 +1,15 @@
+version=1
+[project]
+name="pipeline-mac"
+[sources]
+rtl=["rtl/**/*.sv"]
+[simulation]
+backend="verilator"
+timing=true
+waveform="vcd"
+timeout_ms=120000
+[[test]]
+name="pipeline_mac"
+top="pipeline_mac_tb"
+sources=["tb/pipeline_mac_tb.sv"]
+tags=["smoke","pipeline","signed","overflow"]

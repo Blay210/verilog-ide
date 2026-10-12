@@ -10,3 +10,15 @@ Read `docs/architecture.md` and the current verification notes before extending 
 - Never force begin/end for if/always/for. Respect existing closers, comments, strings, user indentation, ordinary editor shortcuts and explicit tool-install approval.
 - Validate changes with relevant tests and update documentation with actual results and remaining limitations. Keep existing simulation behavior working.
 - During active feature development, build and validate without producing or installing release VSIX packages. Prepare distribution only when the user decides the product is ready for use and asks for it.
+
+# Repository layout (2026-10-09)
+
+Root docs hold shared plans. Existing implementation lives in vsix/; independent app lives in ide/. Run existing build/tests from vsix/. Neither project may import/load the other project or parent source/config; no cross-project file dependencies, workspace links, or build inputs. Each owns its dependencies and lockfile. Copy required code with attribution when explicitly porting it. Root historical .dev artifacts are preserved, not shared application code.
+
+# Verification scheduling (2026-10-12)
+
+Continue implementation and non-interactive build/tests normally. Batch Computer Use and any visible native-app verification into one final integrated session after implementation and ordinary validation; do not repeatedly occupy the user's screen during feature work. Track deferred UI checks explicitly as unverified in the validation notes. Preserve existing windows, profiles and trust settings.
+
+# Cloud handoff entry
+
+A new cloud owner should read CLOUD_HANDOFF.md and docs/cloud-handoff.md before setup or feature work. They consolidate current product decisions, H6D evidence and H7 direction. Cloud setup and Linux results do not establish Windows or physical UI acceptance.

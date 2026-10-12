@@ -1,0 +1,344 @@
+[
+  {
+    "id": "local-builtin-control",
+    "file": "build/lib/builtInExtensions.ts",
+    "before": "const controlFilePath = path.join(os.homedir(), '.vscode-oss-dev', 'extensions', 'control.json');",
+    "after": "const controlFilePath = path.join(root, '..', '.dev', 'extensions', 'control.json');"
+  },
+  {
+    "id": "no-vsix-install",
+    "file": "src/vs/platform/extensionManagement/node/extensionManagementService.ts",
+    "before": "async install(vsix: URI, options: InstallOptions = {}): Promise<ILocalExtension> {",
+    "after": "async install(vsix: URI, options: InstallOptions = {}): Promise<ILocalExtension> {\n\t\tif (this.productService.applicationName === 'rtl-ide') { throw new ExtensionManagementError('External extensions are not supported in RTL IDE.', ExtensionManagementErrorCode.NotAllowed); }"
+  },
+  {
+    "id": "no-location-install",
+    "file": "src/vs/platform/extensionManagement/node/extensionManagementService.ts",
+    "before": "async installFromLocation(location: URI, profileLocation: URI): Promise<ILocalExtension> {",
+    "after": "async installFromLocation(location: URI, profileLocation: URI): Promise<ILocalExtension> {\n\t\tif (this.productService.applicationName === 'rtl-ide') { throw new ExtensionManagementError('External extensions are not supported in RTL IDE.', ExtensionManagementErrorCode.NotAllowed); }"
+  },
+  {
+    "id": "no-profile-install",
+    "file": "src/vs/platform/extensionManagement/node/extensionManagementService.ts",
+    "before": "async installExtensionsFromProfile(extensions: IExtensionIdentifier[], fromProfileLocation: URI, toProfileLocation: URI): Promise<ILocalExtension[]> {",
+    "after": "async installExtensionsFromProfile(extensions: IExtensionIdentifier[], fromProfileLocation: URI, toProfileLocation: URI): Promise<ILocalExtension[]> {\n\t\tif (this.productService.applicationName === 'rtl-ide') { throw new ExtensionManagementError('External extensions are not supported in RTL IDE.', ExtensionManagementErrorCode.NotAllowed); }"
+  },
+  {
+    "id": "no-gallery-install",
+    "file": "src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts",
+    "before": "async installGalleryExtensions(extensions: InstallExtensionInfo[]): Promise<InstallExtensionResult[]> {",
+    "after": "async installGalleryExtensions(extensions: InstallExtensionInfo[]): Promise<InstallExtensionResult[]> {\n\t\tif (this.productService.applicationName === 'rtl-ide') { throw new ExtensionManagementError('External extensions are not supported in RTL IDE.', ExtensionManagementErrorCode.NotAllowed); }"
+  },
+  {
+    "id": "no-install-task",
+    "file": "src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts",
+    "before": "protected async installExtensions(extensions: InstallableExtension[]): Promise<InstallExtensionResult[]> {",
+    "after": "protected async installExtensions(extensions: InstallableExtension[]): Promise<InstallExtensionResult[]> {\n\t\tif (this.productService.applicationName === 'rtl-ide') { throw new ExtensionManagementError('External extensions are not supported in RTL IDE.', ExtensionManagementErrorCode.NotAllowed); }"
+  },
+  {
+    "id": "rtl-chat-hidden",
+    "file": "src/vs/workbench/services/chat/common/chatEntitlementService.ts",
+    "before": "if (this._forceHidden || this.configurationService.getValue(ChatAIDisabledSettingId) === true) {",
+    "after": "if (product.applicationName === 'rtl-ide' || this._forceHidden || this.configurationService.getValue(ChatAIDisabledSettingId) === true) {"
+  },
+  {
+    "id": "extensions-container-empty",
+    "file": "src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts",
+    "before": "alwaysUseContainerInfo: true,",
+    "after": "alwaysUseContainerInfo: true,\n\t\thideIfEmpty: product.applicationName === 'rtl-ide',"
+  },
+  {
+    "id": "extensions-no-open-command",
+    "file": "src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts",
+    "before": "}, ViewContainerLocation.Sidebar);",
+    "after": "}, ViewContainerLocation.Sidebar, { doNotRegisterOpenCommand: product.applicationName === 'rtl-ide' });"
+  },
+  {
+    "id": "extensions-no-install-menus",
+    "file": "src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts",
+    "before": "private registerExtensionAction(extensionActionOptions: IExtensionActionOptions): IDisposable {",
+    "after": "private registerExtensionAction(extensionActionOptions: IExtensionActionOptions): IDisposable {\n\t\tif (product.applicationName === 'rtl-ide' && /install|recommend|search/i.test(extensionActionOptions.id)) { return new DisposableStore(); }"
+  },
+  {
+    "id": "extensions-view-product-import",
+    "file": "src/vs/workbench/contrib/extensions/browser/extensionsViewlet.ts",
+    "before": "import './media/extensionsViewlet.css';",
+    "after": "import './media/extensionsViewlet.css';\nimport product from '../../../../platform/product/common/product.js';"
+  },
+  {
+    "id": "extensions-no-view-list",
+    "file": "src/vs/workbench/contrib/extensions/browser/extensionsViewlet.ts",
+    "before": "private registerViews(): void {",
+    "after": "private registerViews(): void {\n\t\tif (product.applicationName === 'rtl-ide') { return; }"
+  },
+  {
+    "id": "agent-product-import",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "import { IAgentHostByokLmHandler } from '../../../../../../platform/agentHost/common/agentHostByokLm.js';",
+    "after": "import { IAgentHostByokLmHandler } from '../../../../../../platform/agentHost/common/agentHostByokLm.js';\nimport product from '../../../../../../platform/product/common/product.js';"
+  },
+  {
+    "id": "agent-registration-1",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostContribution.ID, AgentHostContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostContribution.ID, AgentHostContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "agent-registration-2",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostExistingSessionHarnessPickerEnablement.ID, AgentHostExistingSessionHarnessPickerEnablement, WorkbenchPhase.BlockRestore);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostExistingSessionHarnessPickerEnablement.ID, AgentHostExistingSessionHarnessPickerEnablement, WorkbenchPhase.BlockRestore); }"
+  },
+  {
+    "id": "agent-registration-3",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostLegacyMigrationGateContribution.ID, AgentHostLegacyMigrationGateContribution, WorkbenchPhase.BlockStartup);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostLegacyMigrationGateContribution.ID, AgentHostLegacyMigrationGateContribution, WorkbenchPhase.BlockStartup); }"
+  },
+  {
+    "id": "agent-registration-4",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(CopilotConfigSlashSubmitHandlerContribution.ID, CopilotConfigSlashSubmitHandlerContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(CopilotConfigSlashSubmitHandlerContribution.ID, CopilotConfigSlashSubmitHandlerContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "agent-registration-5",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostSessionListContribution.ID, AgentHostSessionListContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostSessionListContribution.ID, AgentHostSessionListContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "agent-registration-6",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostOpenSessionLinkOpenerContribution.ID, AgentHostOpenSessionLinkOpenerContribution, WorkbenchPhase.BlockStartup);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostOpenSessionLinkOpenerContribution.ID, AgentHostOpenSessionLinkOpenerContribution, WorkbenchPhase.BlockStartup); }"
+  },
+  {
+    "id": "agent-registration-7",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostTerminalContribution.ID, AgentHostTerminalContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostTerminalContribution.ID, AgentHostTerminalContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "agent-registration-8",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostCopilotCliSettingsContribution.ID, AgentHostCopilotCliSettingsContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostCopilotCliSettingsContribution.ID, AgentHostCopilotCliSettingsContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "agent-registration-9",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostAllowSignedOutWhenUsableContribution.ID, AgentHostAllowSignedOutWhenUsableContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostAllowSignedOutWhenUsableContribution.ID, AgentHostAllowSignedOutWhenUsableContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "agent-registration-10",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostSignedOutModelsNotificationContribution.ID, AgentHostSignedOutModelsNotificationContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostSignedOutModelsNotificationContribution.ID, AgentHostSignedOutModelsNotificationContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "agent-registration-11",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostSdkSetupNotificationContribution.ID, AgentHostSdkSetupNotificationContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostSdkSetupNotificationContribution.ID, AgentHostSdkSetupNotificationContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "agent-registration-12",
+    "file": "src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(AgentHostSandboxNotifications.ID, AgentHostSandboxNotifications, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostSandboxNotifications.ID, AgentHostSandboxNotifications, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "remote-agent-product-import",
+    "file": "src/vs/workbench/contrib/chat/browser/remoteAgentHost/remoteAgentHost.contribution.ts",
+    "before": "import { localize } from '../../../../../nls.js';",
+    "after": "import { localize } from '../../../../../nls.js';\nimport product from '../../../../../platform/product/common/product.js';"
+  },
+  {
+    "id": "remote-agent-registration-1",
+    "file": "src/vs/workbench/contrib/chat/browser/remoteAgentHost/remoteAgentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(RemoteAgentHostContribution.ID, RemoteAgentHostContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(RemoteAgentHostContribution.ID, RemoteAgentHostContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "remote-agent-registration-2",
+    "file": "src/vs/workbench/contrib/chat/browser/remoteAgentHost/remoteAgentHost.contribution.ts",
+    "before": "registerWorkbenchContribution2(EditorCloudSandboxContribution.ID, EditorCloudSandboxContribution, WorkbenchPhase.AfterRestored);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(EditorCloudSandboxContribution.ID, EditorCloudSandboxContribution, WorkbenchPhase.AfterRestored); }"
+  },
+  {
+    "id": "chat-views-product-import",
+    "file": "src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts",
+    "before": "import { IProductService } from '../../../../platform/product/common/productService.js';",
+    "after": "import { IProductService } from '../../../../platform/product/common/productService.js';\nimport product from '../../../../platform/product/common/product.js';"
+  },
+  {
+    "id": "chat-view-inactive",
+    "file": "src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts",
+    "before": "ctorDescriptor: new SyncDescriptor(ChatViewPane),\n\twhen: ContextKeyExpr.and(",
+    "after": "ctorDescriptor: new SyncDescriptor(ChatViewPane),\n\twhen: product.applicationName === 'rtl-ide' ? ContextKeyExpr.false() : ContextKeyExpr.and("
+  },
+  {
+    "id": "chat-update-view-inactive",
+    "file": "src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts",
+    "before": "when: ManagedSettingsUpdateRequiredContext,",
+    "after": "when: product.applicationName === 'rtl-ide' ? ContextKeyExpr.false() : ManagedSettingsUpdateRequiredContext,"
+  },
+  {
+    "id": "chat-not-default-container",
+    "file": "src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts",
+    "before": "{ isDefault: true, doNotRegisterOpenCommand: true }",
+    "after": "{ isDefault: product.applicationName !== 'rtl-ide', doNotRegisterOpenCommand: true }"
+  },
+  {
+    "id": "chat-no-open-command",
+    "file": "src/vs/workbench/contrib/chat/browser/chatParticipant.contribution.ts",
+    "before": "openCommandActionDescriptor: {\n\t\tid: ChatViewContainerId,",
+    "after": "openCommandActionDescriptor: product.applicationName === 'rtl-ide' ? undefined : {\n\t\tid: ChatViewContainerId,"
+  },
+  {
+    "id": "exclude-development-test-builtins",
+    "file": "src/vs/platform/extensionManagement/common/extensionsScannerService.ts",
+    "before": "\t\tlet allSystemExtensions = [...defaultSystemExtensions, ...devSystemExtensions];",
+    "after": "\t\tlet allSystemExtensions = [...defaultSystemExtensions, ...devSystemExtensions];\n\t\tif (this.productService.applicationName === 'rtl-ide') {\n\t\t\tconst developmentTests = new Set(['vscode.vscode-api-tests', 'vscode.vscode-test-resolver', 'vscode.debug-auto-launch']);\n\t\t\tallSystemExtensions = allSystemExtensions.filter(ext => !developmentTests.has(ext.identifier.id.toLowerCase()));\n\t\t}"
+  },
+  {
+    "id": "agent-enablement-product-import",
+    "file": "src/vs/platform/agentHost/browser/agentHostEnablementService.ts",
+    "before": "import { isWeb } from '../../../base/common/platform.js';",
+    "after": "import { isWeb } from '../../../base/common/platform.js';\nimport product from '../../product/common/product.js';"
+  },
+  {
+    "id": "agent-enablement-product-policy",
+    "file": "src/vs/platform/agentHost/browser/agentHostEnablementService.ts",
+    "before": "this.enabled = derived(this, reader => this._isAgentHostRuntimeAvailable && !aiFeaturesDisabled.read(reader));",
+    "after": "this.enabled = derived(this, reader => product.applicationName !== 'rtl-ide' && this._isAgentHostRuntimeAvailable && !aiFeaturesDisabled.read(reader));"
+  },
+  {
+    "id": "agent-prewarm-product-import",
+    "file": "src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts",
+    "before": "import { Disposable } from '../../../../base/common/lifecycle.js';",
+    "after": "import { Disposable } from '../../../../base/common/lifecycle.js';\nimport product from '../../../../platform/product/common/product.js';"
+  },
+  {
+    "id": "agent-prewarm-no-registration",
+    "file": "src/vs/workbench/services/agentHost/electron-browser/agentHostService.ts",
+    "before": "registerWorkbenchContribution2(AgentHostPrewarmContribution.ID, AgentHostPrewarmContribution, WorkbenchPhase.BlockRestore);",
+    "after": "if (product.applicationName !== 'rtl-ide') { registerWorkbenchContribution2(AgentHostPrewarmContribution.ID, AgentHostPrewarmContribution, WorkbenchPhase.BlockRestore); }"
+  },
+  {
+    "id": "rtl-no-default-extension-inspector",
+    "file": "src/vs/platform/environment/common/environmentService.ts",
+    "before": "get debugExtensionHost(): IExtensionHostDebugParams { return parseExtensionHostDebugPort(this.args, this.isBuilt); }",
+    "after": "get debugExtensionHost(): IExtensionHostDebugParams { return parseExtensionHostDebugPort(this.args, this.isBuilt || this.productService.applicationName === 'rtl-ide'); }"
+  },
+  {
+    "id": "rtl-auto-profiler-product-import",
+    "file": "src/vs/workbench/contrib/extensions/electron-browser/extensions.contribution.ts",
+    "before": "import { Disposable } from '../../../../base/common/lifecycle.js';",
+    "after": "import { Disposable } from '../../../../base/common/lifecycle.js';\nimport product from '../../../../platform/product/common/product.js';"
+  },
+  {
+    "id": "rtl-no-auto-extension-profiler",
+    "file": "src/vs/workbench/contrib/extensions/electron-browser/extensions.contribution.ts",
+    "before": "workbenchRegistry.registerWorkbenchContribution(ExtensionsAutoProfiler, LifecyclePhase.Eventually);",
+    "after": "if (product.applicationName !== 'rtl-ide') { workbenchRegistry.registerWorkbenchContribution(ExtensionsAutoProfiler, LifecyclePhase.Eventually); }"
+  },
+  {
+    "id": "rtl-language-detection-product-import",
+    "file": "src/vs/workbench/services/languageDetection/browser/languageDetectionWorkerServiceImpl.ts",
+    "before": "import { Disposable } from '../../../../base/common/lifecycle.js';",
+    "after": "import { Disposable } from '../../../../base/common/lifecycle.js';\nimport product from '../../../../platform/product/common/product.js';"
+  },
+  {
+    "id": "rtl-language-detection-no-history-scan",
+    "file": "src/vs/workbench/services/languageDetection/browser/languageDetectionWorkerServiceImpl.ts",
+    "before": "async detectLanguage(resource: URI, supportedLangs?: string[]): Promise<string | undefined> {\n\t\tconst useHistory",
+    "after": "async detectLanguage(resource: URI, supportedLangs?: string[]): Promise<string | undefined> {\n\t\t// RTL uses registered filename associations; no content model or history scan.\n\t\tif (product.applicationName === 'rtl-ide') {\n\t\t\treturn this._languageDetectionWorkerClient.detectLanguage(resource, undefined, false, supportedLangs);\n\t\t}\n\t\tconst useHistory"
+  },
+  {
+    "id": "rtl-language-detection-no-model-worker",
+    "file": "src/vs/workbench/services/languageDetection/browser/languageDetectionWorkerServiceImpl.ts",
+    "before": "\t\tconst { workerClient, workerTextModelSyncClient } = this._getOrCreateLanguageDetectionWorker();",
+    "after": "\t\t// Unknown RTL files stay in their selected mode until a language is registered.\n\t\tif (product.applicationName === 'rtl-ide') { return undefined; }\n\t\tconst { workerClient, workerTextModelSyncClient } = this._getOrCreateLanguageDetectionWorker();"
+  },
+  {
+    "id": "rtl-development-executable-override",
+    "file": "scripts/code.bat",
+    "before": "set CODE=\".build\\electron\\%NAMESHORT%\"",
+    "after": "set CODE=\".build\\electron\\%NAMESHORT%\"\r\nif defined RTL_IDE_DEV_EXECUTABLE set CODE=\"%RTL_IDE_DEV_EXECUTABLE%\""
+  },
+  {
+    "id": "rtl-development-require-isolated-data",
+    "file": "scripts/code.bat",
+    "before": ":: Get electron, compile, built-in extensions",
+    "after": ":: RTL wrapper launches must carry all private data paths before preLaunch.\r\nif defined RTL_IDE_DEV_EXECUTABLE (\r\n\tset \"RTL_HAVE_PROFILE=\"\r\n\tset \"RTL_HAVE_SHARED=\"\r\n\tset \"RTL_HAVE_EXTENSIONS=\"\r\n\tfor %%A in (%*) do (\r\n\t\tif \"%%~A\"==\"--user-data-dir\" set \"RTL_HAVE_PROFILE=1\"\r\n\t\tif \"%%~A\"==\"--shared-data-dir\" set \"RTL_HAVE_SHARED=1\"\r\n\t\tif \"%%~A\"==\"--extensions-dir\" set \"RTL_HAVE_EXTENSIONS=1\"\r\n\t)\r\n\tset \"RTL_MISSING_DATA=\"\r\n\tif not defined RTL_HAVE_PROFILE set \"RTL_MISSING_DATA=1\"\r\n\tif not defined RTL_HAVE_SHARED set \"RTL_MISSING_DATA=1\"\r\n\tif not defined RTL_HAVE_EXTENSIONS set \"RTL_MISSING_DATA=1\"\r\n\tif defined RTL_MISSING_DATA (\r\n\t\techo RTL development launch requires profile, shared and extensions paths. 1>&2\r\n\t\tpopd\r\n\t\tendlocal\r\n\t\texit /b 1\r\n\t)\r\n)\r\n\r\n:: Get electron, compile, built-in extensions"
+  },
+  {
+    "id": "rtl-spaces-workbench-import",
+    "file": "src/vs/workbench/workbench.common.main.ts",
+    "before": "import './contrib/extensions/browser/extensions.contribution.js';",
+    "after": "import './contrib/extensions/browser/extensions.contribution.js';\nimport './contrib/rtl/browser/rtlSpaces.contribution.js';"
+  },
+  {
+    "id": "rtl-spaces-activity-product-import",
+    "file": "src/vs/workbench/browser/parts/activitybar/activitybarPart.ts",
+    "before": "import { mainWindow } from '../../../../base/browser/window.js';",
+    "after": "import { mainWindow } from '../../../../base/browser/window.js';\nimport product from '../../../../platform/product/common/product.js';"
+  },
+  {
+    "id": "rtl-spaces-activity-height",
+    "file": "src/vs/workbench/browser/parts/activitybar/activitybarPart.ts",
+    "before": "const contentHeight = Math.max(0, height - top - bottom);",
+    "after": "const contentHeight = Math.max(0, height - top - bottom - (product.applicationName === 'rtl-ide' ? 96 : 0));"
+  },
+  {
+    "id": "rtl-no-user-extension-scan",
+    "file": "src/vs/platform/extensionManagement/common/extensionsScannerService.ts",
+    "before": "async scanUserExtensions(scanOptions: UserExtensionsScanOptions): Promise<IScannedExtension[]> {",
+    "after": "async scanUserExtensions(scanOptions: UserExtensionsScanOptions): Promise<IScannedExtension[]> {\n\t\t// RTL IDE ships its own built-ins; arbitrary user extensions are not a product feature.\n\t\tif (this.productService.applicationName === 'rtl-ide') { return []; }"
+  },
+  {
+    "id": "rtl-editor-space-header-relayout",
+    "file": "src/vs/workbench/browser/parts/editor/editorPart.ts",
+    "before": "parent.appendChild(this.container);",
+    "after": "parent.appendChild(this.container);\n\t\tif (product.applicationName === 'rtl-ide' && this.windowId === mainWindow.vscodeWindowId) {\n\t\t\tlet fallback = parent.classList.contains('rtl-space-fallback');\n\t\t\tconst observer = new mainWindow.MutationObserver(() => {\n\t\t\t\tconst next = parent.classList.contains('rtl-space-fallback');\n\t\t\t\tif (next === fallback) { return; }\n\t\t\t\tfallback = next;\n\t\t\t\tthis._onDidChange.fire(undefined);\n\t\t\t\tconst dimension = this.rtlSpaceLayout;\n\t\t\t\tif (dimension) { this.layout(dimension.width, dimension.height, dimension.top, dimension.left); }\n\t\t\t});\n\t\t\tobserver.observe(parent, { attributes: true, attributeFilter: ['class'] });\n\t\t\tthis._register({ dispose: () => observer.disconnect() });\n\t\t}"
+  },
+  {
+    "id": "rtl-editor-spaces-product-import",
+    "file": "src/vs/workbench/browser/parts/editor/editorPart.ts",
+    "before": "import { Part } from '../../part.js';",
+    "after": "import { Part } from '../../part.js';\nimport product from '../../../../platform/product/common/product.js';"
+  },
+  {
+    "id": "rtl-editor-space-header-reserve",
+    "file": "src/vs/workbench/browser/parts/editor/editorPart.ts",
+    "before": "// Layout contents\n\t\tconst contentAreaSize = super.layoutContents(width, height).contentSize;\n\n\t\t// Layout editor container\n\t\tthis.doLayout(Dimension.lift(contentAreaSize), top, left);",
+    "after": "// RTL workspace fallback occupies its own header, never editor text.\n\t\tconst rtlHeader = product.applicationName === 'rtl-ide' && this.windowId === mainWindow.vscodeWindowId && this.element.classList.contains('rtl-space-fallback') ? 40 : 0;\n\t\tthis.container.style.paddingTop = rtlHeader ? `${rtlHeader}px` : '';\n\t\theight = Math.max(0, height - rtlHeader);\n\t\t// Layout contents\n\t\tconst contentAreaSize = super.layoutContents(width, height).contentSize;\n\n\t\t// Layout editor container\n\t\tthis.doLayout(Dimension.lift(contentAreaSize), top + rtlHeader, left);"
+  },
+  {
+    "id": "rtl-editor-space-layout-dimensions",
+    "file": "src/vs/workbench/browser/parts/editor/editorPart.ts",
+    "before": "override layout(width: number, height: number, top: number, left: number): void {",
+    "after": "private rtlSpaceLayout: { width: number; height: number; top: number; left: number } | undefined;\n\toverride layout(width: number, height: number, top: number, left: number): void {\n\t\tthis.rtlSpaceLayout = { width, height, top, left };"
+  },
+  {
+    "id": "rtl-editor-space-header-minimum-height",
+    "file": "src/vs/workbench/browser/parts/editor/editorPart.ts",
+    "before": "return Math.min(this.centeredLayoutWidget.minimumHeight, this.layoutService.getMaximumEditorDimensions(this.layoutService.getContainer(getWindow(this.container))).height);",
+    "after": "return Math.min(this.centeredLayoutWidget.minimumHeight + (product.applicationName === 'rtl-ide' && this.element?.classList.contains('rtl-space-fallback') ? 40 : 0), this.layoutService.getMaximumEditorDimensions(this.layoutService.getContainer(getWindow(this.container))).height);"
+  },
+  {
+    "id": "rtl-simulation-channel-import",
+    "file": "src/vs/code/electron-utility/sharedProcess/sharedProcessMain.ts",
+    "before": "import { ProxyChannel, StaticRouter } from '../../../base/parts/ipc/common/ipc.js';",
+    "after": "import { ProxyChannel, StaticRouter } from '../../../base/parts/ipc/common/ipc.js';\nimport { RtlSimulationChannel } from '../../../platform/rtl/node/rtlSimulationChannel.js';"
+  },
+  {
+    "id": "rtl-simulation-channel-registration",
+    "file": "src/vs/code/electron-utility/sharedProcess/sharedProcessMain.ts",
+    "before": "private initChannels(accessor: ServicesAccessor): void {\n\n\t\tconst instantiationService = accessor.get(IInstantiationService);",
+    "after": "private initChannels(accessor: ServicesAccessor): void {\n\n\t\tconst instantiationService = accessor.get(IInstantiationService);\n\t\tif (product.applicationName === 'rtl-ide') {\n\t\t\tconst rtlSimulation = this._register(new RtlSimulationChannel());\n\t\t\tthis.server.registerChannel('rtlSimulation', rtlSimulation);\n\t\t\tthis._register(this.server.onDidRemoveConnection(connection => rtlSimulation.disconnect(connection.ctx)));\n\t\t}"
+  }
+]

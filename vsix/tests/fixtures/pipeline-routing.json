@@ -1,0 +1,591 @@
+{
+  "graph": {
+    "version": 1,
+    "kind": "rtl-semantic",
+    "instanceId": "pipeline_mac_tb.signed4",
+    "status": "supported",
+    "reason": "",
+    "nodes": [
+      {
+        "id": "n0",
+        "kind": "signal",
+        "label": "clk",
+        "signalType": {
+          "text": "logic",
+          "simpleIntegral": true,
+          "width": 1,
+          "signed": false,
+          "fourState": true
+        },
+        "signalPath": "pipeline_mac_tb.signed4.clk",
+        "signalName": "clk",
+        "declarationId": "pipeline_mac_tb.signed4.clk"
+      },
+      {
+        "id": "n1",
+        "kind": "signal",
+        "label": "rst",
+        "signalType": {
+          "text": "logic",
+          "simpleIntegral": true,
+          "width": 1,
+          "signed": false,
+          "fourState": true
+        },
+        "signalPath": "pipeline_mac_tb.signed4.rst",
+        "signalName": "rst",
+        "declarationId": "pipeline_mac_tb.signed4.rst"
+      },
+      {
+        "id": "n2",
+        "kind": "signal",
+        "label": "en",
+        "signalType": {
+          "text": "logic",
+          "simpleIntegral": true,
+          "width": 1,
+          "signed": false,
+          "fourState": true
+        },
+        "signalPath": "pipeline_mac_tb.signed4.en",
+        "signalName": "en",
+        "declarationId": "pipeline_mac_tb.signed4.en"
+      },
+      {
+        "id": "n3",
+        "kind": "signal",
+        "label": "a",
+        "signalType": {
+          "text": "logic signed[3:0]",
+          "simpleIntegral": true,
+          "width": 4,
+          "signed": true,
+          "fourState": true
+        },
+        "signalPath": "pipeline_mac_tb.signed4.a",
+        "signalName": "a",
+        "declarationId": "pipeline_mac_tb.signed4.a"
+      },
+      {
+        "id": "n4",
+        "kind": "signal",
+        "label": "b",
+        "signalType": {
+          "text": "logic signed[3:0]",
+          "simpleIntegral": true,
+          "width": 4,
+          "signed": true,
+          "fourState": true
+        },
+        "signalPath": "pipeline_mac_tb.signed4.b",
+        "signalName": "b",
+        "declarationId": "pipeline_mac_tb.signed4.b"
+      },
+      {
+        "id": "n5",
+        "kind": "signal",
+        "label": "acc",
+        "signalType": {
+          "text": "logic signed[5:0]",
+          "simpleIntegral": true,
+          "width": 6,
+          "signed": true,
+          "fourState": true
+        },
+        "signalPath": "pipeline_mac_tb.signed4.acc",
+        "signalName": "acc",
+        "declarationId": "pipeline_mac_tb.signed4.acc"
+      },
+      {
+        "id": "n6",
+        "kind": "signal",
+        "label": "product",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        },
+        "signalPath": "pipeline_mac_tb.signed4.product",
+        "signalName": "product",
+        "declarationId": "pipeline_mac_tb.signed4.product"
+      },
+      {
+        "id": "n7",
+        "kind": "signal",
+        "label": "stage",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        },
+        "signalPath": "pipeline_mac_tb.signed4.stage",
+        "signalName": "stage",
+        "declarationId": "pipeline_mac_tb.signed4.stage"
+      },
+      {
+        "id": "n8",
+        "kind": "conversion",
+        "label": "implicit conversion",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n9",
+        "kind": "conversion",
+        "label": "implicit conversion",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n10",
+        "kind": "operator",
+        "label": "×",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n11",
+        "kind": "constant",
+        "label": "8'd0",
+        "signalType": {
+          "text": "logic[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": false,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n12",
+        "kind": "conversion",
+        "label": "implicit conversion",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n13",
+        "kind": "constant",
+        "label": "6'b0",
+        "signalType": {
+          "text": "logic[5:0]",
+          "simpleIntegral": true,
+          "width": 6,
+          "signed": false,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n14",
+        "kind": "conversion",
+        "label": "implicit conversion",
+        "signalType": {
+          "text": "logic signed[5:0]",
+          "simpleIntegral": true,
+          "width": 6,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n15",
+        "kind": "conversion",
+        "label": "implicit conversion",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n16",
+        "kind": "operator",
+        "label": "+",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n17",
+        "kind": "conversion",
+        "label": "implicit conversion",
+        "signalType": {
+          "text": "logic signed[5:0]",
+          "simpleIntegral": true,
+          "width": 6,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n18",
+        "kind": "control",
+        "label": "if / else",
+        "signalType": {
+          "text": "logic signed[5:0]",
+          "simpleIntegral": true,
+          "width": 6,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n19",
+        "kind": "control",
+        "label": "if / else",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n20",
+        "kind": "control",
+        "label": "if / else",
+        "signalType": {
+          "text": "logic signed[5:0]",
+          "simpleIntegral": true,
+          "width": 6,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n21",
+        "kind": "control",
+        "label": "if / else",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n22",
+        "kind": "register",
+        "label": "acc · next state",
+        "signalType": {
+          "text": "logic signed[5:0]",
+          "simpleIntegral": true,
+          "width": 6,
+          "signed": true,
+          "fourState": true
+        }
+      },
+      {
+        "id": "n23",
+        "kind": "register",
+        "label": "stage · next state",
+        "signalType": {
+          "text": "logic signed[7:0]",
+          "simpleIntegral": true,
+          "width": 8,
+          "signed": true,
+          "fourState": true
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": "n3",
+        "target": "n8",
+        "role": "operand"
+      },
+      {
+        "source": "n4",
+        "target": "n9",
+        "role": "operand"
+      },
+      {
+        "source": "n8",
+        "target": "n10",
+        "role": "left"
+      },
+      {
+        "source": "n9",
+        "target": "n10",
+        "role": "right"
+      },
+      {
+        "source": "n10",
+        "target": "n6",
+        "role": "assignment"
+      },
+      {
+        "source": "n11",
+        "target": "n12",
+        "role": "operand"
+      },
+      {
+        "source": "n13",
+        "target": "n14",
+        "role": "operand"
+      },
+      {
+        "source": "n5",
+        "target": "n15",
+        "role": "operand"
+      },
+      {
+        "source": "n15",
+        "target": "n16",
+        "role": "left"
+      },
+      {
+        "source": "n7",
+        "target": "n16",
+        "role": "right"
+      },
+      {
+        "source": "n16",
+        "target": "n17",
+        "role": "operand"
+      },
+      {
+        "source": "n2",
+        "target": "n18",
+        "role": "condition"
+      },
+      {
+        "source": "n17",
+        "target": "n18",
+        "role": "true"
+      },
+      {
+        "source": "n5",
+        "target": "n18",
+        "role": "false / hold"
+      },
+      {
+        "source": "n2",
+        "target": "n19",
+        "role": "condition"
+      },
+      {
+        "source": "n6",
+        "target": "n19",
+        "role": "true"
+      },
+      {
+        "source": "n7",
+        "target": "n19",
+        "role": "false / hold"
+      },
+      {
+        "source": "n1",
+        "target": "n20",
+        "role": "condition"
+      },
+      {
+        "source": "n14",
+        "target": "n20",
+        "role": "true"
+      },
+      {
+        "source": "n18",
+        "target": "n20",
+        "role": "false"
+      },
+      {
+        "source": "n1",
+        "target": "n21",
+        "role": "condition"
+      },
+      {
+        "source": "n12",
+        "target": "n21",
+        "role": "true"
+      },
+      {
+        "source": "n19",
+        "target": "n21",
+        "role": "false"
+      },
+      {
+        "source": "n20",
+        "target": "n22",
+        "role": "next state"
+      },
+      {
+        "source": "n0",
+        "target": "n22",
+        "role": "clock ↑"
+      },
+      {
+        "source": "n22",
+        "target": "n5",
+        "role": "state output"
+      },
+      {
+        "source": "n21",
+        "target": "n23",
+        "role": "next state"
+      },
+      {
+        "source": "n0",
+        "target": "n23",
+        "role": "clock ↑"
+      },
+      {
+        "source": "n23",
+        "target": "n7",
+        "role": "state output"
+      }
+    ],
+    "modules": [],
+    "diagnostics": [],
+    "test": "pipeline_mac"
+  },
+  "selected": {
+    "id": "pipeline_mac_tb.signed4",
+    "name": "signed4",
+    "module": "pipeline_mac_signed",
+    "kind": "instance",
+    "parameters": [],
+    "children": [],
+    "ports": [
+      {
+        "name": "clk",
+        "direction": "input",
+        "type": "logic",
+        "internalSignal": "pipeline_mac_tb.signed4.clk",
+        "signalType": {
+          "text": "logic",
+          "simpleIntegral": true,
+          "width": 1,
+          "signed": false,
+          "fourState": true
+        },
+        "connection": {
+          "kind": "top",
+          "text": "",
+          "references": []
+        }
+      },
+      {
+        "name": "rst",
+        "direction": "input",
+        "type": "logic",
+        "internalSignal": "pipeline_mac_tb.signed4.rst",
+        "signalType": {
+          "text": "logic",
+          "simpleIntegral": true,
+          "width": 1,
+          "signed": false,
+          "fourState": true
+        },
+        "connection": {
+          "kind": "top",
+          "text": "",
+          "references": []
+        }
+      },
+      {
+        "name": "en",
+        "direction": "input",
+        "type": "logic",
+        "internalSignal": "pipeline_mac_tb.signed4.en",
+        "signalType": {
+          "text": "logic",
+          "simpleIntegral": true,
+          "width": 1,
+          "signed": false,
+          "fourState": true
+        },
+        "connection": {
+          "kind": "top",
+          "text": "",
+          "references": []
+        }
+      },
+      {
+        "name": "a",
+        "direction": "input",
+        "type": "logic signed[3:0]",
+        "internalSignal": "pipeline_mac_tb.signed4.a",
+        "signalType": {
+          "text": "logic signed[3:0]",
+          "simpleIntegral": true,
+          "width": 4,
+          "signed": true,
+          "fourState": true
+        },
+        "connection": {
+          "kind": "top",
+          "text": "",
+          "references": []
+        }
+      },
+      {
+        "name": "b",
+        "direction": "input",
+        "type": "logic signed[3:0]",
+        "internalSignal": "pipeline_mac_tb.signed4.b",
+        "signalType": {
+          "text": "logic signed[3:0]",
+          "simpleIntegral": true,
+          "width": 4,
+          "signed": true,
+          "fourState": true
+        },
+        "connection": {
+          "kind": "top",
+          "text": "",
+          "references": []
+        }
+      },
+      {
+        "name": "acc",
+        "direction": "output",
+        "type": "logic signed[5:0]",
+        "internalSignal": "pipeline_mac_tb.signed4.acc",
+        "signalType": {
+          "text": "logic signed[5:0]",
+          "simpleIntegral": true,
+          "width": 6,
+          "signed": true,
+          "fourState": true
+        },
+        "connection": {
+          "kind": "top",
+          "text": "",
+          "references": []
+        }
+      }
+    ]
+  }
+}

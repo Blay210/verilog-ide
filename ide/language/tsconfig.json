@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2022"
+    ],
+    "esModuleInterop": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "../upstream/src/vscode-dts/vscode.d.ts"
+  ]
+}

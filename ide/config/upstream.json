@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/microsoft/vscode",
+  "tag": "1.141.0",
+  "revision": "2a59476c9bfcb90b3ddc372c36762471b7dfad1c",
+  "archiveUrl": "https://codeload.github.com/microsoft/vscode/zip/2a59476c9bfcb90b3ddc372c36762471b7dfad1c",
+  "archiveSha256": "6d91e0d97fe04b0d15058322a8a000f94971eebb81a2afa3175f515251a4f949",
+  "node": "24.18.0",
+  "license": "MIT",
+  "note": "SHA256 recorded from the official archive downloaded on 2026-10-09; not an upstream signature.",
+  "packageLockSha256": "286c91eca07e79d56f3a195aff95c7a8a2d8c6dbb589e20e28a80d5ae793816e"
+}

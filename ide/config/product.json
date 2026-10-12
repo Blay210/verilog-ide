@@ -1,0 +1,105 @@
+{
+  "baselineSha256": "104a252a18d584b91176d24d20a12b7e08ce9225cf0cb176906928c068c1a945",
+  "values": {
+    "nameShort": "RTL IDE",
+    "nameLong": "RTL IDE (Development)",
+    "applicationName": "rtl-ide",
+    "dataFolderName": ".rtl-ide",
+    "sharedDataFolderName": ".rtl-ide-shared",
+    "win32MutexName": "rtl-ide",
+    "win32AppUserModelId": "RTLIDE.Development",
+    "win32DirName": "RTL IDE",
+    "win32NameVersion": "RTL IDE",
+    "win32RegValueName": "RTLIDE",
+    "win32ShellNameShort": "RTL IDE",
+    "win32x64AppId": "{{A267A9AE-08B2-4B9C-B951-96F472424C99}",
+    "win32arm64AppId": "{{BA6931E6-0383-42B0-91BA-33E6F50B8DB1}",
+    "win32x64UserAppId": "{{64C12903-7F73-457F-B148-E7C72C0EFBD2}",
+    "win32arm64UserAppId": "{{F38A745A-5889-457E-8ABA-B5E5BF54E270}",
+    "urlProtocol": "rtl-ide",
+    "serverApplicationName": "rtl-ide-server",
+    "serverDataFolderName": ".rtl-ide-server",
+    "tunnelApplicationName": "rtl-ide-tunnel",
+    "win32TunnelServiceMutex": "rtl-ide-tunnel-service",
+    "win32TunnelMutex": "rtl-ide-tunnel",
+    "darwinBundleIdentifier": "dev.rtlide.application",
+    "linuxDesktopName": "dev.rtlide.application",
+    "builtInExtensions": [],
+    "defaultChatAgent": {
+      "extensionId": "GitHub.copilot",
+      "chatExtensionId": "GitHub.copilot-chat",
+      "chatExtensionOutputId": "GitHub.copilot-chat.GitHub Copilot Chat.log",
+      "chatExtensionOutputExtensionStateCommand": "github.copilot.debug.extensionState",
+      "documentationUrl": "https://aka.ms/github-copilot-overview",
+      "termsStatementUrl": "https://aka.ms/github-copilot-terms-statement",
+      "privacyStatementUrl": "https://aka.ms/github-copilot-privacy-statement",
+      "skusDocumentationUrl": "https://aka.ms/github-copilot-plans",
+      "optimizeUsageDocumentationUrl": "https://aka.ms/token-usage-tips",
+      "publicCodeMatchesUrl": "https://aka.ms/github-copilot-match-public-code",
+      "managePlanUrl": "https://aka.ms/github-copilot-manage-plan",
+      "upgradePlanUrl": "https://aka.ms/github-copilot-upgrade-plan",
+      "signUpUrl": "https://aka.ms/github-sign-up",
+      "provider": {
+        "default": {
+          "id": "github",
+          "name": "GitHub"
+        },
+        "enterprise": {
+          "id": "github-enterprise",
+          "name": "GHE"
+        },
+        "google": {
+          "id": "google",
+          "name": "Google"
+        },
+        "apple": {
+          "id": "apple",
+          "name": "Apple"
+        },
+        "microsoft": {
+          "id": "microsoft",
+          "name": "Microsoft"
+        }
+      },
+      "providerExtensionId": "vscode.github-authentication",
+      "providerUriSetting": "github-enterprise.uri",
+      "providerScopes": [
+        [
+          "read:user",
+          "user:email",
+          "repo",
+          "workflow"
+        ],
+        [
+          "user:email"
+        ],
+        [
+          "read:user"
+        ]
+      ],
+      "entitlementUrl": "https://api.github.com/copilot_internal/user",
+      "entitlementSignupLimitedUrl": "https://api.github.com/copilot_internal/subscribe_limited_user",
+      "chatQuotaExceededContext": "github.copilot.chat.quotaExceeded",
+      "completionsQuotaExceededContext": "github.copilot.completions.quotaExceeded",
+      "walkthroughCommand": "github.copilot.open.walkthrough",
+      "completionsMenuCommand": "github.copilot.toggleStatusMenu",
+      "chatRefreshTokenCommand": "github.copilot.refreshToken",
+      "generateCommitMessageCommand": "github.copilot.git.generateCommitMessage",
+      "resolveMergeConflictsCommand": "github.copilot.git.resolveMergeConflicts",
+      "completionsAdvancedSetting": "github.copilot.advanced",
+      "completionsEnablementSetting": "github.copilot.enable",
+      "nextEditSuggestionsSetting": "github.copilot.nextEditSuggestions.enabled",
+      "tokenEntitlementUrl": "https://api.github.com/copilot_internal/v2/token",
+      "mcpRegistryDataUrl": "https://api.github.com/copilot/mcp_registry",
+      "mcpConnectorsUrl": "https://api.github.com/copilot-connectors/api/v1",
+      "managedSettingsUrl": "https://api.github.com/copilot_internal/managed_settings"
+    }
+  },
+  "remove": [
+    "extensionsGallery",
+    "webBuiltInExtensions",
+    "reportIssueUrl"
+  ],
+  "appliedSha256": "a51b7e6856c8423f0525a5b4e23ed6fbce02ea2ac5860a76b8dc18b61495a587",
+  "previousAppliedSha256": "aa014c2e7f7a488c79497e9244894a643f94c51bd678a46ca6e3e9bdd72d5c94"
+}

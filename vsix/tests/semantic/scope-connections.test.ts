@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import {mkdir,mkdtemp,cp,writeFile,readFile} from 'node:fs/promises';
+import {loadProject,runTest,loadRecordedTrace,loadRecordedInputs} from '@rtl-dev/core';
+import {SlangProvider,buildScopeConnections,type HierarchyNode} from '@rtl-dev/semantic';
+import {detectTools} from '@rtl-dev/toolchain';
+import {VerilatorBackend} from '@rtl-dev/verilator';
+import {parseVcd,valueAt,mapTracePorts} from '@rtl-dev/waveform';
+import {renderStructure} from '../../packages/vscode/src/structure-view';
+import {StructureNavigation} from '../../packages/vscode/src/structure-navigation';
+const python=process.env.RTL_SEMANTIC_PYTHON;
+const flatten=(nodes:HierarchyNode[]):HierarchyNode[]=>nodes.flatMap(n=>[n,...flatten(n.children)]);
+test('native 2x2 whole-signal connectivity, expression isolation and real signed matrix simulation',
+  {skip:!python||process.env.RTL_INTEGRATION!=='1',timeout:300000},async()=>{
+  await mkdir('.dev/scope-connections',{recursive:true});
+  const root=await mkdtemp(path.resolve('.dev/scope-connections/한글 matrix '));
+  await cp('examples/systolic-mini',root,{recursive:true,filter:source=>path.basename(source)!=='.rtl'});
+  const project=await loadProject(root),provider=new SlangProvider(python!,path.resolve('packages/semantic/python/analyze.py'),path.join(root,'.rtl/cache'));
+  const hierarchy=await provider.hierarchy(project,'matrix_basic',[]);
+  assert.equal(hierarchy.diagnostics.filter(d=>d.severity==='error').length,0,JSON.stringify(hierarchy.diagnostics));
+  const dut=flatten(hierarchy.roots).find(n=>n.id==='matrix_tb.dut')!;
+  const graph=buildScopeConnections(dut);
+  assert.equal(graph.blocks.length,4);assert.equal(graph.nets.length,12);assert.equal(graph.unresolved.length,2);
+  assert.ok(graph.nets.every(n=>!n.ambiguous));
+  const partial=graph.nets.find(n=>n.id==='matrix_tb.dut.partial0')!;
+  assert.deepEqual(partial.terminals.map(t=>[t.instanceId,t.port.name,t.role]),[['matrix_tb.dut.pe00','acc_out','driver'],['matrix_tb.dut.pe10','acc_in','sink']]);
+  const navigation=new StructureNavigation();navigation.update(hierarchy.roots,'matrix');navigation.visit(dut.id);
+  const view=renderStructure(dut,'nonce',false,{navigation:navigation.state(),context:{project:'matrix',mode:'current'}});
+  assert.match(view.html,/Module connections/);assert.equal(view.html.match(/data-scope-net=/g)?.length,20);
+  assert.ok(view.nodes.has('matrix_tb.dut.pe00'));assert.equal(view.ports.size,24,'Ordinary current view keeps existing port detail model');
+  const source=path.join(root,'rtl/systolic_array.sv'),original=await readFile(source,'utf8');
+  const expression=await provider.hierarchy(project,'matrix_basic',[{file:source,text:original.replace('.data_in(a0)',".data_in(a0 + 8'sd1)")}]);
+  const exprDut=flatten(expression.roots).find(n=>n.id===dut.id)!;
+  assert.equal(buildScopeConnections(exprDut).unresolved.length,3,'Expressions cannot masquerade as shared wires');
+  const pe=await provider.internalOperations(project,'matrix_basic','matrix_tb.dut.pe00',[]);
+  assert.equal(pe.status,'supported',pe.reason);assert.ok(pe.nodes.some(n=>n.kind==='operator'&&n.label==='×'));
+  const tools=await detectTools();assert.ok(tools.toolchain);
+  const result=await runTest(project,project.tests[0],new VerilatorBackend(tools.toolchain));
+  assert.equal(result.status,'passed',result.message);assert.ok(result.waveform);
+  const saved=await loadRecordedInputs(result),retained=await provider.hierarchy(saved.project,saved.target.name,[]);
+  const trace=await loadRecordedTrace(result),wave=parseVcd(trace.bytes.toString()),bindings=mapTracePorts(retained,wave.signals,'matrix_tb');
+  for(const [name,time,value] of [['y0','5000',-7],['y1','5000',-25],['y0','7000',-2],['y1','7000',58]] as const) {
+    const binding=bindings.find(b=>b.instanceId===dut.id&&b.port===name)!;assert.equal(binding.state,'matched');
+    const signal=wave.signals.find(s=>s.id===binding.signalId)!;
+    assert.equal(valueAt(wave.channels.get(signal.code)!,BigInt(time)),BigInt.asUintN(16,BigInt(value)).toString(2).padStart(16,'0'));
+  }
+  await writeFile(path.join(root,'.rtl/scope-receipt.json'),JSON.stringify({passed:true,blocks:4,nets:12,wires:20,expressionIsolated:true,leafSupported:true,simulation:result.status,runId:result.runId},null,2));
+  console.log('SCOPE_CONNECTIONS_PASS: '+root);
+});

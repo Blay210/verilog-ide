@@ -1,0 +1,17 @@
+node_modules/
+dist/
+out/
+.dev/
+.rtl/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Reproducible upstream source, prepared by the pinned bootstrap
+/upstream/
+/.upstream-tags.txt

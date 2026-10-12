@@ -2,6 +2,10 @@
 
 # IDE 화면 구성 — 사용자 제안과 설계 방향
 
+## 2026-10-07 Structure 진입점 확정
+
+Simulation처럼 가장 왼쪽 Activity Bar에 구조도 전용 아이콘을 둔다. 클릭하면 왼쪽 RTL Hierarchy와 중앙 모듈 구조도 canvas를 함께 사용하는 작업 화면으로 진입한다. 중앙 탭만 추가하거나 hierarchy만 열고 별도 명령으로 canvas를 여는 요구가 아니다. [구조도 요구·현재 차이·실행 방향](structure-schematic-direction.md)을 따른다. 사용자 요구를 확정한 것이며 해당 전용 진입점과 schematic 화면의 구현 완료를 뜻하지 않는다. Update의 미저장 코드 반영 정책은 확인 대기다.
+
 ## 2026-10-05 구현 갱신과 Explorer 요청
 
 U01 단일 커서와 U02 Simulation container를 구현했다. [현재 전체 상태](project-roadmap.md), [Simulation 수용](simulation-panel-acceptance.md)이 아래 최초 제안의 미구현 문구보다 우선한다.

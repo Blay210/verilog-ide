@@ -1,0 +1,46 @@
+{
+  "name": "rtl-independent-ide",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Independent RTL IDE development shell",
+  "scripts": {
+    "bootstrap": "powershell -NoProfile -File scripts/bootstrap.ps1",
+    "doctor": "node scripts/dev.mjs doctor",
+    "deps:install": "node scripts/dev.mjs install",
+    "compile": "node scripts/dev.mjs compile",
+    "compile:core": "node scripts/dev.mjs compile-core",
+    "start": "node scripts/dev.mjs start",
+    "verify:policy": "node scripts/verify-policy.mjs",
+    "verify:host-policy": "node scripts/verify-host-policy.mjs",
+    "verify:language-policy": "node scripts/verify-language-policy.mjs",
+    "verify:editor": "node scripts/verify-editor.mjs",
+    "verify:terminal": "node scripts/verify-editor.mjs terminal",
+    "verify:launcher": "node scripts/verify-editor.mjs batch",
+    "verify:startup": "node scripts/verify-startup.mjs",
+    "verify:cli-policy": "node scripts/verify-cli-policy.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build:runtime": "tsc -p runtime/tsconfig.json",
+    "verify:simulation": "npm run build:runtime && node scripts/verify-simulation.mjs",
+    "verify:source-paths": "npm run build:runtime && node scripts/verify-source-paths.mjs",
+    "verify:import-ui": "node scripts/verify-import-ui.mjs",
+    "verify:simulation-ui": "npm run build:runtime && node scripts/verify-editor.mjs simulation",
+    "verify:waveform-ui": "npm run build:runtime && node scripts/verify-editor.mjs waveform",
+    "verify:simulation-channel": "npm run build:runtime && node scripts/verify-simulation-channel.mjs",
+    "build:language": "tsc -p language/tsconfig.json",
+    "verify:language-ui": "node scripts/verify-editor.mjs language",
+    "pretest": "npm run build:runtime && npm run build:language"
+  },
+  "dependencies": {
+    "fast-glob": "3.3.3",
+    "smol-toml": "1.9.1",
+    "vscode-languageclient": "9.0.1",
+    "vscode-languageserver": "9.0.1",
+    "vscode-languageserver-textdocument": "1.0.12",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "esbuild": "0.25.12",
+    "typescript": "5.9.3"
+  }
+}

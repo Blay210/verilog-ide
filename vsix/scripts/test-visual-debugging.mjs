@@ -1,0 +1,16 @@
+import './build.mjs';
+import {build} from 'esbuild';
+import {mkdir,mkdtemp,readFile} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import path from 'node:path';
+const code=process.env.VSCODE_EXECUTABLE,project=process.env.RTL_E3_PROJECT;
+if(!code||!project)throw Error('Set VSCODE_EXECUTABLE and RTL_E3_PROJECT to the verified E3 integration fixture.');
+await mkdir('.dev/e4-host',{recursive:true});const root=await mkdtemp(path.resolve('.dev/e4-host/run-')),suite=path.join(root,'suite.cjs');
+await build({entryPoints:[process.env.RTL_E4_ANALYSIS_CANCEL==='1'?'tests/vscode/structure-analysis-cancel.ts':process.env.RTL_E4_PHYSICAL_CLOCK==='1'?'tests/vscode/structure-cancel.ts':'tests/vscode/visual-debugging.ts'],bundle:true,platform:'node',format:'cjs',external:['vscode'],outfile:suite});
+const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
+env.RTL_E4_GATE=path.join(root,'verdict.json');
+env.RTL_E4_RECEIPT=path.join(root,'receipt.json');
+console.log('E4 development host:',root,'project:',project);
+const child=spawn(code,[project,'--new-window','--disable-extensions','--disable-workspace-trust','--skip-welcome','--skip-release-notes','--user-data-dir',path.join(root,'profile'),'--extensions-dir',path.join(root,'extensions'),'--extensionDevelopmentPath='+path.resolve('packages/vscode'),'--extensionTestsPath='+suite],{env,windowsHide:false,stdio:'inherit'});
+child.on('error',e=>{console.error(e);process.exitCode=1;});
+child.on('exit',async code=>{process.exitCode=code??1;try{if(JSON.parse(await readFile(env.RTL_E4_RECEIPT,'utf8')).passed!==true)process.exitCode=1;}catch{process.exitCode=1;console.error('E4 host receipt missing.');}});

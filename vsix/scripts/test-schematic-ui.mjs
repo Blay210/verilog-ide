@@ -1,0 +1,25 @@
+import './build.mjs';
+import {build} from 'esbuild';
+import {mkdir,mkdtemp,cp,readFile,writeFile} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import path from 'node:path';
+const code=process.env.VSCODE_EXECUTABLE;
+if(!code)throw Error('Set VSCODE_EXECUTABLE.');
+await mkdir('.dev/schematic-ui',{recursive:true});
+const root=await mkdtemp(path.resolve('.dev/schematic-ui/run-')),project=path.join(root,'project'),suite=path.join(root,'suite.cjs');
+await mkdir(project);
+if(process.env.RTL_SCHEMATIC_4X4_FIXTURE) {
+  const fixture=path.resolve(process.env.RTL_SCHEMATIC_4X4_FIXTURE);
+  const relative=path.relative(path.resolve('.dev/e4'),fixture);
+  if(relative.startsWith('..')||path.isAbsolute(relative))throw Error('Use a generated private .dev/e4 fixture.');
+  await mkdir(path.join(project,'rtl'));await mkdir(path.join(project,'tb'));
+  for(const name of ['matrix.sv','mac_pe.sv'])await cp(path.join(fixture,name),path.join(project,'rtl',name));
+  await writeFile(path.join(project,'tb/matrix_tb.sv'), 'module matrix_tb; timeunit 1ns; timeprecision 1ps; matrix dut(); endmodule\n');
+  await writeFile(path.join(project,'rtl.toml'),'version=1\n[project]\nname="schematic-4x4-ui"\n[sources]\nrtl=["rtl/*.sv"]\n[[test]]\nname="matrix_basic"\ntop="matrix_tb"\nsources=["tb/matrix_tb.sv"]\n');
+}else for(const name of ['rtl','tb','rtl.toml'])await cp(path.join('examples/systolic-mini',name),path.join(project,name),{recursive:true});
+await build({entryPoints:['tests/vscode/schematic-ui.ts'],bundle:true,platform:'node',format:'cjs',external:['vscode'],outfile:suite});
+const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
+console.log('Schematic UI host:',root);
+const child=spawn(code,[project,'--new-window','--disable-extensions','--disable-workspace-trust','--skip-welcome','--skip-release-notes','--user-data-dir',path.join(root,'profile'),'--extensions-dir',path.join(root,'extensions'),'--extensionDevelopmentPath='+path.resolve('packages/vscode'),'--extensionTestsPath='+suite],{env,windowsHide:false,stdio:'inherit'});
+child.on('error',e=>{console.error(e);process.exitCode=1;});
+child.on('exit',async code=>{process.exitCode=code??1;try{if(JSON.parse(await readFile(path.join(project,'.rtl/schematic-ui-host.json'),'utf8')).passed!==true)process.exitCode=1;}catch{process.exitCode=1;console.error('Schematic UI receipt missing.');}});

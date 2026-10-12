@@ -1,0 +1,14 @@
+import './build.mjs';
+import {build} from 'esbuild';
+import {mkdir,mkdtemp,readFile} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import path from 'node:path';
+const code=process.env.VSCODE_EXECUTABLE,project=process.env.RTL_E3_PROJECT;
+if(!code||!project)throw Error('Set VSCODE_EXECUTABLE and RTL_E3_PROJECT to the verified E3 integration fixture.');
+await mkdir('.dev/e3-host',{recursive:true});const root=await mkdtemp(path.resolve('.dev/e3-host/run-')),suite=path.join(root,'suite.cjs');
+await build({entryPoints:[process.env.RTL_E4_CANCEL_TEST==='1'?'tests/vscode/structure-cancel.ts':'tests/vscode/pipeline-mac.ts'],bundle:true,platform:'node',format:'cjs',external:['vscode'],outfile:suite});
+const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
+console.log('E3 development host:',root,'project:',project);
+const child=spawn(code,[project,'--new-window','--disable-extensions','--disable-workspace-trust','--skip-welcome','--skip-release-notes','--user-data-dir',path.join(root,'profile'),'--extensions-dir',path.join(root,'extensions'),'--extensionDevelopmentPath='+path.resolve('packages/vscode'),'--extensionTestsPath='+suite],{env,windowsHide:true,stdio:'inherit'});
+child.on('error',e=>{console.error(e);process.exitCode=1;});
+child.on('exit',async code=>{process.exitCode=code??1;try{if(JSON.parse(await readFile(path.join(project,'.rtl/e3-host.json'),'utf8')).passed!==true)process.exitCode=1;}catch{process.exitCode=1;console.error('E3 host receipt missing.');}});

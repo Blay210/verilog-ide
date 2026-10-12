@@ -3,6 +3,11 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Python analysis caches (keep Python source and dependency declarations)
+__pycache__/
+*.pyc
+*.pyo
+
 # Local toolchains, isolated editor profiles, and verification artifacts
 /.dev/
 .rtl/
@@ -45,3 +50,12 @@ Desktop.ini
 # Keep sources, tests, docs, examples, package-lock.json, and shared
 # .vscode/launch.json + tasks.json in Git. Do not exclude *.sv, *.v,
 # *.vcd, or *.json globally: these can be source/config/test fixtures.
+
+# Independent subproject artifacts
+/vsix/.dev/
+/ide/.dev/
+/ide/out/
+/vsix/packages/vscode/README.md
+/vsix/packages/vscode/LICENSE
+/vsix/packages/vscode/docs/
+/vsix/packages/vscode/THIRD-PARTY-NOTICES.txt

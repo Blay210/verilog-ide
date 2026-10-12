@@ -1,0 +1,13 @@
+version=1
+[project]
+name="systolic-mini"
+[sources]
+rtl=["rtl/**/*.sv"]
+[simulation]
+backend="verilator"
+timing=true
+waveform="vcd"
+[[test]]
+name="matrix_basic"
+top="matrix_tb"
+sources=["tb/matrix_tb.sv"]

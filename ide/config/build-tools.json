@@ -1,0 +1,21 @@
+{
+  "python": {
+    "version": "3.14.8",
+    "url": "https://www.python.org/ftp/python/3.14.8/python-3.14.8-embed-amd64.zip",
+    "sha256": "a93abe456ab01bd96d7a085b3cdb6566b3063f4241360d114142fbdb07f0a310",
+    "relativeExecutable": ".dev/tools/python-3.14.8-embed/python.exe",
+    "purpose": "Native build interpreter, not a pip/semantic analysis environment"
+  },
+  "msvc": {
+    "bootstrapUrl": "https://aka.ms/vs/17/release/vs_buildtools.exe",
+    "publisher": "Microsoft Corporation",
+    "components": [
+      "Microsoft.VisualStudio.Workload.VCTools",
+      "Microsoft.VisualStudio.Component.Windows11SDK.26100",
+      "Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre",
+      "Microsoft.VisualStudio.Component.VC.ATL.Spectre",
+      "Microsoft.VisualStudio.Component.VC.ATLMFC.Spectre"
+    ],
+    "note": "Requires explicit user install approval and Windows administrator consent; native build validates compatibility."
+  }
+}

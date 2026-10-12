@@ -1,0 +1,96 @@
+[
+  {
+    "source": "src/rtlSpaces.contribution.ts",
+    "target": "src/vs/workbench/contrib/rtl/browser/rtlSpaces.contribution.ts",
+    "previousSha256": "76fa9ee78f2842f816761fbf8ab98e3f9e8ab961248cb4e7fa713fd27fa61fef"
+  },
+  {
+    "source": "src/rtlSimulationHome.ts",
+    "target": "src/vs/workbench/contrib/rtl/browser/rtlSimulationHome.ts",
+    "previousSha256": "d0fad024c59267a76b6d0b9f1d5b8e7557294bfb461abcc8b2a1f91addbf56b2"
+  },
+  {
+    "source": "src/rtlSimulationChannel.ts",
+    "target": "src/vs/platform/rtl/node/rtlSimulationChannel.ts",
+    "previousSha256": "92c1186b6c206d485db6f32b44a502d1f352496865844657d0a0963ca59e39b9"
+  },
+  {
+    "source": "src/rtlRuntime.d.ts",
+    "target": "src/vs/platform/rtl/node/runtime.d.ts",
+    "previousSha256": "2239a2647533a3c73d9045636d3c89cc046c85e41aab6b71e9a3910566b97ea8"
+  },
+  {
+    "source": "runtime/contract.ts",
+    "target": "src/vs/platform/rtl/common/rtlSimulation.ts",
+    "previousSha256": "1b01976d92cc2e75800f23e52f83b9e57c6ba26e80cab849bc65d41db6842621"
+  },
+  {
+    "source": "runtime/waveform/model.ts",
+    "target": "src/vs/platform/rtl/common/waveform/model.ts",
+    "previousSha256": "3c3558e0f5f20a1a4ee6431e44e54c689a805a575d55970e3d73b0b94f58808b"
+  },
+  {
+    "source": "runtime/waveform/views.ts",
+    "target": "src/vs/platform/rtl/common/waveform/views.ts"
+  },
+  {
+    "source": "language/package.json",
+    "target": "extensions/rtl-language/package.json",
+    "previousSha256": "1a1b4166de62a9da6a9757c3f69c4d66ab1d8478a48b3d0fbf22d25ea87f0aa4"
+  },
+  {
+    "source": "language/language-configuration.json",
+    "target": "extensions/rtl-language/language-configuration.json"
+  },
+  {
+    "source": "language/LICENSE",
+    "target": "extensions/rtl-language/LICENSE"
+  },
+  {
+    "source": "language/syntaxes/verilog.tmLanguage.json",
+    "target": "extensions/rtl-language/syntaxes/verilog.tmLanguage.json"
+  },
+  {
+    "source": "language/syntaxes/systemverilog.tmLanguage.json",
+    "target": "extensions/rtl-language/syntaxes/systemverilog.tmLanguage.json"
+  },
+  {
+    "source": "language/icons/verilog-light.svg",
+    "target": "extensions/rtl-language/icons/verilog-light.svg"
+  },
+  {
+    "source": "language/icons/verilog-dark.svg",
+    "target": "extensions/rtl-language/icons/verilog-dark.svg"
+  },
+  {
+    "source": "language/icons/systemverilog-light.svg",
+    "target": "extensions/rtl-language/icons/systemverilog-light.svg"
+  },
+  {
+    "source": "language/icons/systemverilog-dark.svg",
+    "target": "extensions/rtl-language/icons/systemverilog-dark.svg"
+  },
+  {
+    "source": "language/python/analyze.py",
+    "target": "extensions/rtl-language/dist/analyze.py"
+  },
+  {
+    "source": "runtime/discovery-model.ts",
+    "target": "src/vs/platform/rtl/common/discovery-model.ts",
+    "previousSha256": "69669ca1e45bc98cf69813e853bae791f9ed52b176a695f7280ce67bfed9e6c2"
+  },
+  {
+    "source": "src/rtlExplorerRun.ts",
+    "target": "src/vs/workbench/contrib/rtl/browser/rtlExplorerRun.ts",
+    "previousSha256": "82bf76d7a71a57cfadcc9c5461ffad2f366fe2f7d036cbedc091704a70aef8f7"
+  },
+  {
+    "source": "runtime/test-files.ts",
+    "target": "src/vs/platform/rtl/common/testFiles.ts"
+  },
+  {
+    "source": "runtime/folder-roles.ts",
+    "target": "src/vs/platform/rtl/common/folderRoles.ts",
+    "previousSha256": "0362dfe084b582ef122d2fe06a315ecc63b94753e4c2310bb3d8548d4843973b"
+  }
+]
