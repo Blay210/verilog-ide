@@ -2,10 +2,11 @@ import { loadProject, runTests, selectTests, type InputOverride, type OperationC
 import { freezeInputOverrides } from './core/input-overrides';
 import { detectTools } from './toolchain/detect';
 import { VerilatorBackend } from './verilator/index';
+import { ProcessFailure } from './core/process';
 
 /** Node host boundary. No renderer, editor or VS Code API dependency. */
 export class SimulationError extends Error {
-  constructor(readonly kind: 'project' | 'tool' | 'busy' | 'cancelled', message: string) { super(message); }
+  constructor(readonly kind: 'project' | 'tool' | 'busy' | 'cancelled' | 'cleanup', message: string, cause?: unknown) { super(message, { cause }); }
 }
 export type BackendResolver = (context: OperationContext) => Promise<SimulatorBackend>;
 export async function existingBackend(context: OperationContext, toolsDirectory?: string): Promise<SimulatorBackend> {
@@ -32,22 +33,26 @@ export interface SimulationEvents extends OperationContext {
 
 export class SimulationService {
   private active?: AbortController;
+  private failedCleanup?: string;
   constructor(private readonly resolveBackend?: BackendResolver) {}
   get running(): boolean { return !!this.active; }
+  get cleanupFailure(): string | undefined { return this.failedCleanup; }
   cancel(): void { this.active?.abort(); }
-  async inspect(root: string) {
-    try { return await loadProject(root); }
-    catch (error) { throw new SimulationError('project', String(error)); }
+  async inspect(root: string, signal?: AbortSignal) {
+    try { return await loadProject(root, undefined, signal); }
+    catch (error) { throw new SimulationError('project', String(error), error); }
   }
   async run(request: SimulationRequest, events: SimulationEvents = {}): Promise<TestResult[]> {
     if (this.active) throw new SimulationError('busy', 'A simulation is already running. Cancel it or wait for completion.');
+    if (this.failedCleanup) throw new SimulationError('cleanup', `${this.failedCleanup} Restart the session after the owned processes have stopped.`);
     const inputOverrides = freezeInputOverrides(request.inputOverrides);
     const controller = new AbortController();
     this.active = controller;
     const signal = events.signal ? AbortSignal.any([controller.signal, events.signal]) : controller.signal;
     try {
       signal.throwIfAborted();
-      const project = await this.inspect(request.root);
+      const project = await this.inspect(request.root, signal);
+      signal.throwIfAborted();
       let targets: TestTarget[];
       try {
         if (project.backend !== 'verilator') throw Error(`Unsupported simulator: ${project.backend}`);
@@ -60,11 +65,15 @@ export class SimulationService {
       let backend: SimulatorBackend;
       try { backend = await (this.resolveBackend ? this.resolveBackend({ signal, onLog: events.onLog }) : existingBackend({ signal, onLog: events.onLog }, request.toolsDirectory)); }
       catch (error) {
+        if (error instanceof ProcessFailure && error.cleanupFailed) throw error;
         if (signal.aborted) throw new SimulationError('cancelled', 'Simulation cancelled before build.');
         throw new SimulationError('tool', String(error));
       }
-      return await runTests(project, targets, backend, { ...events, signal, jobs: 1, inputOverrides });
+      const results = await runTests(project, targets, backend, { ...events, signal, jobs: 1, inputOverrides });
+      this.failedCleanup = results.find(result => result.cleanupFailure)?.cleanupFailure;
+      return results;
     } catch (error) {
+      if (error instanceof ProcessFailure && error.cleanupFailed) { this.failedCleanup = error.message; throw new SimulationError('cleanup', error.message); }
       if (signal.aborted) throw new SimulationError('cancelled', 'Simulation cancelled before a result was recorded.');
       throw error;
     } finally { this.active = undefined; }

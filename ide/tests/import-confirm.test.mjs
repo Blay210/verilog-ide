@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { root } from '../scripts/environment.mjs';
 const require = createRequire(import.meta.url);
-const { discoverProject, saveImportSettings, confirmImportSettings, loadProject, discover } = require('../dist/runtime/core/index.js');
+const { discoverProject, saveImportSettings, confirmImportSettings, loadProject, discover, readImportRecovery } = require('../dist/runtime/core/index.js');
 const { SlangProvider } = require('../dist/runtime/semantic/slang.js');
 const { SimulationHostSession } = require('../dist/runtime/host.js');
 const { SimulationService } = require('../dist/runtime/simulation.js');
@@ -56,7 +56,8 @@ test('confirmation reanalyzes and rejects compiler errors, stale manifest and ex
   } };
   await assert.rejects(confirmImportSettings({ ...review, manifestRevision: saved.revision }, { ids }, changing), /manually changed/);
   assert.equal(await fs.readFile(path.join(dir, 'rtl.toml'), 'utf8'), bytes.toString() + '# external edit\n');
-  assert.deepEqual(await fs.readdir(path.join(dir, '.rtl')), []);
+  assert.deepEqual(await fs.readdir(path.join(dir, '.rtl')), ['import-transactions']);
+  assert.deepEqual(await readImportRecovery(dir), []);
 });
 test('literal file paths retain bracket filenames and reject traversal, links and generated folders', async t => {
   const { dir } = await fixture(t);
@@ -76,5 +77,6 @@ test('cancelled and read-only confirmation preserve pending manifest and release
   await assert.rejects(confirmImportSettings(pending, { ids }, provider, controller.signal), /abort/i);
   await fs.chmod(file, 0o444);
   try { await assert.rejects(confirmImportSettings(pending, { ids }, provider), /read-only|EPERM|EACCES/); } finally { await fs.chmod(file, 0o666); }
-  assert.deepEqual(await fs.readFile(file), bytes); assert.deepEqual(await fs.readdir(path.join(dir, '.rtl')), []);
+  assert.deepEqual(await fs.readFile(file), bytes); assert.deepEqual(await fs.readdir(path.join(dir, '.rtl')), ['import-transactions']);
+  assert.deepEqual(await readImportRecovery(dir), []);
 });

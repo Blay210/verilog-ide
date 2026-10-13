@@ -104,6 +104,7 @@ const manifestSchema = z.object({ version: z.literal(1), runId: z.string().uuid(
  * No original source/manifest is consulted, so archived analysis survives source changes.
  */
 export async function loadRecordedInputs(result: TestResult, signal?: AbortSignal): Promise<RecordedInputs> {
+  signal?.throwIfAborted();
   if (result.inputSnapshot?.version !== 1 || result.inputSnapshot.state !== 'ready') throw Error(result.inputSnapshot?.reason ?? 'No supported recorded inputs for this result.');
   const directory = path.resolve(result.directory), record = path.join(directory, 'input-snapshot.json'), root = path.join(directory, 'inputs');
   for (const candidate of [path.dirname(path.dirname(directory)), path.dirname(directory), directory, root, record]) {
@@ -111,29 +112,39 @@ export async function loadRecordedInputs(result: TestResult, signal?: AbortSigna
   }
   const info = await lstat(record);
   if (!info.isFile() || info.size > 2 * 1024 * 1024) throw Error('Invalid snapshot manifest size.');
-  const manifest = manifestSchema.parse(JSON.parse(await readFile(record, 'utf8')));
+  const manifest = manifestSchema.parse(JSON.parse(await readFile(record, { encoding: 'utf8', signal })));
   if (manifest.runId !== result.runId || manifest.target.name !== result.name || manifest.target.top !== result.top ||
       manifest.identity.fingerprint !== result.inputSnapshot.fingerprint || !equal(path.join(manifest.project.root, '.rtl', 'runs', path.basename(directory)), directory))
     throw Error('Snapshot/result context mismatch.');
   const expected = sha(JSON.stringify({ settings: manifest.identity.settings, files: manifest.identity.files }));
   if (expected !== manifest.identity.fingerprint) throw Error('Snapshot identity mismatch.');
+  const normalize = (file: string) => process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file);
+  const identities = new Map(manifest.identity.files.map(input => [normalize(input.path), input.sha256]));
+  if (identities.size !== manifest.identity.files.length) throw Error('Incomplete snapshot.');
   const overridden = new Set<string>();
   for (const input of manifest.overrides ?? []) {
     const file = process.platform === 'win32' ? path.resolve(input.path).toLowerCase() : path.resolve(input.path);
-    if (overridden.has(file) || !manifest.identity.files.some(entry => equal(entry.path, input.path) && entry.sha256 === input.sha256)) throw Error('Editor input provenance mismatch.');
+    if (overridden.has(file) || identities.get(file) !== input.sha256) throw Error('Editor input provenance mismatch.');
     overridden.add(file);
   }
   if (JSON.stringify([...(result.inputSnapshot.unsavedFiles ?? [])].map(file => process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file)).sort()) !== JSON.stringify([...overridden].sort())) throw Error('Editor input/result provenance mismatch.');
   // Confirm the stored configuration is the configuration originally hashed.
   const observed = JSON.parse(manifest.identity.settings);
-  const normalize = (file: string) => process.platform === 'win32' ? path.resolve(file).toLowerCase() : path.resolve(file);
   const settings = inputSettings(manifest.project, manifest.target);
   if (settings !== manifest.identity.settings || observed.root !== normalize(manifest.project.root)) throw Error('Snapshot settings mismatch.');
-  const mappings = new Map<string,string>(), content = new Map<string,Buffer>(); let bytes = 0;
+  const mappings = new Map<string,string>(), content = new Map<string,Buffer>();
   for (const mapping of manifest.mappings) {
     signal?.throwIfAborted();
     if (mappings.has(normalize(mapping.original)) || mapping.relative !== relative(manifest.project.root, mapping.original)) throw Error('Invalid snapshot mapping.');
     const file = path.join(root, mapping.relative);
+    if (identities.get(normalize(mapping.original)) !== mapping.sha256) throw Error('Snapshot file identity mismatch.');
+    mappings.set(normalize(mapping.original), file);
+  }
+  if (mappings.size !== manifest.identity.files.length) throw Error('Incomplete snapshot.');
+  let bytes = 0, retainedBytes = 0;
+  async function readMapping(mapping: typeof manifest.mappings[number]): Promise<void> {
+    signal?.throwIfAborted();
+    const file = mappings.get(normalize(mapping.original))!;
     let current = root;
     for (const part of mapping.relative.split(path.sep)) {
       current = path.join(current, part);
@@ -141,12 +152,22 @@ export async function loadRecordedInputs(result: TestResult, signal?: AbortSigna
     }
     const stat = await lstat(file);
     if (!stat.isFile() || stat.size > 32 * 1024 * 1024 || (bytes += stat.size) > 128 * 1024 * 1024) throw Error('Invalid snapshot input size.');
-    const retained = await readFile(file); content.set(file, retained);
+    const retained = await readFile(file, { signal });
+    signal?.throwIfAborted();
+    if (retained.length > 32 * 1024 * 1024 || (retainedBytes += retained.length) > 128 * 1024 * 1024) throw Error('Invalid snapshot input size.');
     if (sha(retained) !== mapping.sha256) throw Error('Recorded source content was modified.');
-    if (!manifest.identity.files.some(input => equal(input.path, mapping.original) && input.sha256 === mapping.sha256)) throw Error('Snapshot file identity mismatch.');
-    mappings.set(normalize(mapping.original), file);
+    content.set(file, retained);
   }
-  if (mappings.size !== manifest.identity.files.length) throw Error('Incomplete snapshot.');
+  // Bound buffers/I/O and join every reader on failure or abort; no work escapes a request.
+  let next = 0, failure: { error: unknown } | undefined;
+  async function readNext(): Promise<void> {
+    try {
+      while (!failure && next < manifest.mappings.length) await readMapping(manifest.mappings[next++]);
+    } catch (error) { failure ??= { error }; }
+  }
+  await Promise.all(Array.from({ length: Math.min(8, manifest.mappings.length) }, readNext));
+  if (failure) throw failure.error;
+  signal?.throwIfAborted();
   const allowedFiles = new Set([...mappings.values()].map(normalize));
   let directories = 0;
   async function verifyTree(folder: string): Promise<void> {

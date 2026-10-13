@@ -10,6 +10,10 @@ export interface WaveformQuery { token: string; kind: 'window' | 'values' | 'edg
 export interface EditorInput { path: string; text: string; version?: number }
 export interface RecordedSource { file: string; unsaved: boolean }
 export interface RecordedSourceText extends RecordedSource { text: string }
+export interface ImportRecovery { id: string; revision: string; current: boolean; previous: boolean; candidate: boolean }
+export type ImportRecoveryChoice = 'current' | 'previous' | 'candidate';
+export interface ImportArchivePlan { revision: string; count: number; retained: number; bytes: number }
+export interface ImportJournalState { count: number; limit: number; archive?: ImportArchivePlan }
 export interface RunComparison { name: string; runId: string; saved: NonNullable<SimulationResultView['inputs']>; current: NonNullable<SimulationResultView['currentInputs']> }
 export interface SimulationResultView {
   name: string; top: string; status: 'passed' | 'failed' | 'cancelled' | 'timedOut';
@@ -18,6 +22,7 @@ export interface SimulationResultView {
   unsavedFiles?: string[];
   currentInputs?: { state: 'matching' | 'changed' | 'unavailable' | 'legacy'; message: string };
 }
+export type TestListEdit = { action: 'folder'; path: string } | { action: 'file'; path: string } | { action: 'exclude'; file: string; top: string; name?: string } | { action: 'restore'; file: string; top: string; name?: string };
 export interface SimulationTestView {
   name: string; top: string; source?: string; latest?: SimulationResultView;
 }
@@ -30,15 +35,24 @@ export interface SimulationState {
   phase: 'idle' | 'loading' | 'running' | 'cancelling' | 'error';
   activeTest?: string; log: string; error?: string;
   history?: SimulationResultView[];
+  /** Rows come from retained results, not a runnable current project. */
+  historyOnly?: boolean;
+  importRecovery?: ImportRecovery[];
+  importJournal?: ImportJournalState;
   review?: DiscoveryReview;
   importPreview?: ImportPreview;
   sourceSync?: SourceSyncState;
   savedFolderRoles?: SavedFolderRoles;
+  testList?: { revision: string; folders: string[]; manual: string[]; excluded: { file: string; top: string; name?: string }[] };
 }
 export interface SimulationHost {
   readonly state: SimulationState;
   inspect(root: string): Promise<SimulationState>;
+  editTestList(edit: TestListEdit, revision: string, approved: boolean): Promise<SimulationState>;
   manageProject(approved: boolean): Promise<SimulationState>;
+  recoverImport(request: ImportRecovery, choice: ImportRecoveryChoice, approved: boolean): Promise<SimulationState>;
+  importRecoveryText(request: ImportRecovery, choice: ImportRecoveryChoice): Promise<string>;
+  archiveImport(request: ImportArchivePlan, approved: boolean): Promise<SimulationState>;
   classify(selection: RoleSelection): Promise<SimulationState>;
   saveReview(approved: boolean): Promise<SimulationState>;
   prepareReview(selection: ImportSelection, approved: boolean, toolsDirectory?: string): Promise<SimulationState>;

@@ -149,9 +149,12 @@ export async function discoverProject(directory: string, options: DiscoveryOptio
       const handle = await open(resolved, 'r');
       try {
         const buffers: Buffer[] = []; let bytes = 0;
+        // Small files need small chunks, including the EOF probe. Keep a 4 KiB
+        // floor so a file growing from an empty stat cannot cause bytewise I/O.
+        const chunkBytes = Math.max(4096, Math.min(65536, entry.size + 1));
         while (bytes <= limits.fileBytes) {
           options.signal?.throwIfAborted();
-          const buffer = Buffer.allocUnsafe(Math.min(65536, limits.fileBytes - bytes + 1));
+          const buffer = Buffer.allocUnsafe(Math.min(chunkBytes, limits.fileBytes - bytes + 1));
           const { bytesRead } = await handle.read(buffer, 0, buffer.length, null);
           if (!bytesRead) break;
           bytes += bytesRead;

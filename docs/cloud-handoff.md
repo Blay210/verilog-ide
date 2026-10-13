@@ -1,6 +1,76 @@
+## 클라우드 통합 준비 최신 (2026-10-13 KST)
+
+사용자 PC 없이 pinned upstream root/build frozen type 의존성과 checksum Electron 선언을 준비해 공식 TS7 7.0.2 본체 전체 타입·owned 출력 **0 errors/exit0**, runtime/language build를 확인했다. 홈 미사용 import를 제거하고 이전 owned hash를 보존했다. 실제 Node channel4묶음·TB file/folder rename/빈 폴더 재생성·20 add/delete/202 rows·idle/도구0/설정 불변,100 late caller의 한 후속 scan과 close join/무게시를 검증했다. 작은 소스 읽기 chunk를4–64KiB로 조정해 같은 선택 hash/read806회의 buffer 할당52.8→3.30MB(**93.75% 감소**), 최종 관련20 PASS/0 FAIL/0 SKIP. 버퍼 변경 후 최종 순차 전체 회귀 **335 PASS/0 FAIL/1 Windows batch SKIP(총336개)**. 합성 단독 계측의 Core 중앙값/반복 tail은 개선 미확인이며 전체 RSS/Windows UI 성능으로 확대하지 않는다. install_script/start_skill 초안을 추가 저장했고 게시/새 task 복원은 별도다. Windows native IPC/watcher/NTFS/taskkill·마지막 화면/대표 실제 설계 성능 및 별도 FST/전체 disk 정책 잔여를 유지한다. [변경·근거·재현·제한](ide-cloud-integration-preparation.md). 아래는 이전 기록이다.
+
+## Simulation TB 자동 목록 최신 (2026-10-13 UTC)
+
+사용자 요청의 TB 폴더 자동 추가·삭제/한 파일 여러 top 분리·파일이 남아도 사용자 제외 우선/폴더 밖 프로젝트 내 수동 등록·명시적 복원을 구현했다. 실행·로그·파형 hover는 정확히 해당 이름을 표시한다. source-first `rtl-tests.json`에 선택을 보존하며 자동 이벤트는 원본/TOML/JSON 쓰기·컴파일·시뮬레이션 없이 목록만 갱신한다. 기존 이름/이력/읽기 전용 보관 소스/파형·trust/dirty/root/revision/cleanup·IDE/VSIX 독립성을 유지한다. runtime/language build와 최종 관련 **38 PASS/0 FAIL/0 SKIP**, 실제 Linux OS 이벤트→production 홈/real host의 두 top 추가·삭제/제외/수동 등록·행 재사용/idle·tool calls0/history0을 확인했다. 별도 private fixture에서 명시적 Verilator Run 두 TB PASS/VCD·삭제 후 history2 보존. 최종 순차 전체 회귀 **332 PASS/0 FAIL/1 Windows batch SKIP(총333개)**. Windows 공식 전체 본체 타입/emission·native IPC/watcher/NTFS·물리 hover/대형 목록 성능은 미검증이며 P0→P1 마지막 통합 계획을 유지한다. [동작·검증·제한·다음 작업](ide-tb-auto-catalog.md). 아래 기록의 TB 수동 Apply-only 설명은 이전 계약이다.
+
+## Simulation 홈 디자인 최신 (2026-10-13 UTC)
+
+사용자 캡처 검토 요청으로 독립 IDE의 Simulation 홈을 실행/관리 카드·테스트별 카드·로그 패널로 정리했다. 오른쪽 실행(초록 삼각형)·로그(터미널)·파형 아이콘과 Source Code 기능 그룹, 전체 실행 버튼 강조·둥근 모서리/간격·테마 토큰·좁은 폭 줄바꿈을 적용했고 기존 실행/이력/신뢰/입력 비교 동작과 VSIX 독립성을 유지한다. 새 UI 의존성/애니메이션/상시 작업 없음. runtime build·화면2파일 구문 변환·최종 관련 **27 PASS/0 FAIL/0 SKIP**(변경 감지3 포함)·아이콘 tooltip/접근성/Tab 순서, Chromium 실제 화면 코드의 다크/라이트 및 800/480/320px 가로 넘침·선택/행 유지·과거 이력/최신 복원·잠금/로그 접기 수용을 확인했다. 캡처는 클라우드 컴포넌트이며 Windows 전체 창/본체 전체 타입·emission/IPC·DPI·고대비/물리 수용은 별도다. 기존 예제의 retained PASS를 재사용했고 새 simulation/파형 열기 없음. 다음은 기존 H7S 후 Windows 통합 준비/P0→P1 순서이며 이번 디자인을 H7 전체 완료로 표현하지 않는다. [변경·근거·제한·인수인계](ide-simulation-home-design.md). 아래는 이전 진행 기록이다.
+
 # 독립 RTL IDE 클라우드 인수인계
 
-기준일: **2026-10-12 / H6D 완료 후**. 목적은 대화 기록 없는 실행자에게 사용자와 함께 발전시킨 제품 의도, 현재 코드, 근거와 다음 순서를 전달하는 것이다. 이것은 클라우드 환경을 실제 구축하거나 검증했다는 기록이 아니다.
+기준일: **2026-10-13 / H6 범위 판정·H7S enum 표시 재사용·lookup/대기 분리 후**. 목적은 대화 기록 없는 실행자에게 사용자와 함께 발전시킨 제품 의도, 현재 코드, 근거와 다음 순서를 전달하는 것이다. 이 문서의 과거 Windows 근거와 아래의 실제 Linux 온보딩/H7A～H7S 결과를 구분한다.
+
+## 현재 클라우드 결과와 다음 진입점
+
+GitHub main 확인 시 HEAD85ba1fe6f245182faf90602628560cd04f8bcf69와 클라우드 work 기준이 같았다. Debian13/Node24.19.0, Python3.12.14/pyslang11.0.0, Verilator5.032를 준비했다. 온보딩에서 IDE144 PASS/1 Windows SKIP·VSIX225 PASS/2 platform SKIP·build/typecheck와 실제 VCD/FST4회 PASS를 확인했다. Windows native 전체 빌드·화면은 실행하지 않았다. install_script/start_skill 저장 초안과 실제 머신 검증은 완료했지만 게시/새 task 복원은 별도다.
+
+[H6 수용표](ide-h6-acceptance-summary.md)에서 기본 개발 경로를 판정했다. [H7A](ide-h7a-history-recovery.md)는 최신 trace/log 삭제 시 결과 보존·이력 병렬 조회·300 RTL/1000 history 합성 계측을 완료했다. Linux 최종150 PASS/0 FAIL/1 Windows batch SKIP·runtime/language build. [H7B](ide-h7b-input-validation-cost.md)에서 retained 검증 비용을 분리하고 identity lookup/제한 병렬 읽기, project epoch·A/B/A 거절·조회 취소/close 대기를 보완했다. Linux157 PASS/0 FAIL/1 Windows SKIP·runtime/language build, 기존 실제 VCD/FST4개 retained 재검증 PASS(새 simulation 없음). 동일 fixture retained 중앙값797→133ms/host 비교1827→918ms를 관찰했고 파일 검사 수는 유지했다. [H7C](ide-h7c-process-cleanup.md)는 실제 tree/peer/timeout·정리 실패/지연·기록 실패의 분류 보존, session quarantine·close reject·IPC error routing을 완료했다. Linux171 PASS/0 FAIL/1 Windows SKIP·runtime/language build, 실제 Verilator3회 정상→취소→retry PASS(live build group8→0·이전 trace/원본 보존), pinned base+real host Node adapter headless3묶음 PASS. Node channel 이전 owned hash를 overlay에 기록했다. Windows taskkill/종료·공식 본체 TS7 타입/target emission·앱 화면은 미실행이다. [H7D](ide-h7d-waveform-restoration.md)는 waveform open의 root/epoch·A/B/A 보호, trace 검증 취소/join·반복 close/dispose join·실제 worker 종료까지4개 slot 유지, 새 host/별도 OS process의 retained run/default view 재열기를 완료했다. Linux176 PASS/0 FAIL/1 Windows SKIP·runtime/language build. 4,096 신호/262,144 changes·동시4 reader×6회와 기존 실제 Verilator VCD2개 조회 PASS·parent26 created/26 exited/live0. 새 simulation/앱 화면 없음. RSS는baseline61.4→최종닫힘365.8MiB·main heap8.6→10.8MiB이며 RSS 회복 수용은 남는다. [H7E](ide-h7e-cache-memory.md)에서 보관 source64MiB/256 entries LRU·model removal/project 전환/dispose 해제·coalescing/epoch/late navigation 보호를 보완했다. 이전 provider2 FAIL 재현·관련13 PASS·Linux187 PASS/0 FAIL/1 Windows SKIP·runtime/language build. 동일4,096신호의 Linux3case×12회에서144worker 전부 exit·thread11→15→11, worker live heap 약19.8MiB로 유지됐다. 진단 glibc trim은 default RSS375.7→345.3MiB를 반환했으나 Anonymous317.3MiB가 남아 전체 RSS 원인은 미해결이다. allocator 설정/helper는 진단 child 한정이다. Home 이전 owned hash와 새 cache overlay를 기록했고 공식 전체 TS7/target emission·실제 model/tab/diff 해제·앱 화면은 미실행이다. [H7F](ide-h7f-project-recovery.md)는 현재 DUT/TOML이 손상·삭제/linked 상태여도 historyOnly 보관 행의 로그/source/파형을 유지하고 Run/Explorer·현재 비교를 잠그며 복구 후 해제한다. log epoch/close join·source row 재연결, PID/UUID lease의 real writer 게시 전/후 crash/fresh retry와 delayed reclaimer race를 보완했다. Linux196 PASS/0 FAIL/1 Windows SKIP·runtime/language build·관련26 PASS/client8 PASS. 별도 비협력 writer의 마지막 검사/rename 진단은 외부 bytes overwrite로 **FAIL/exit1**이며 정상 suite에 합산하지 않는다. 이 H7F 시점의 다음 작업이 H7G journal·publication 설계였다. unknown/legacy lock과 orphan temp를 무조건 삭제/승격하지 않는다. native RSS/장시간·실제 설계·Windows 공식 본체/실제 lease/보관 UI/통합 gate는 유지한다. 아래 H6 문서의 '다음 단계'는 각 시점의 역사이며 최신 진입점은 이 문단이다.
+
+## H7S 최신 — enum 표시 정보 재사용·lookup/요청 대기 구분 (2026-10-13 UTC)
+
+기존 pyslang의 동일 native enum identity/고정 lookup scope에서 해석한 표시 값·spelling을 요청 안에서만 재사용한다(최대64 types/4096 values/1MiB UTF-8 payload, 상한 거절 시 원래 계산·각 output 별도 복사). native lookup·default/decl order·shadowing·parameterization·Core/journal·신뢰/미저장/파일/실제 cleanup 보호를 유지하며 자체 compiler/simulator·상시 worker/settled cache는 추가하지 않았다. dense enum32/variables96의 실제 lookup9332→950/두 contexts·전후5회 전체 semantic/hierarchy30쌍 JSON 일치, unqualified 완성 중앙값1405.0→642.6ms·해당 Python peak55.6→41.4MiB를 확인했다. 일반 IPC 편집→완성949.5→979.4ms는 개선 미확인이다. snapshot 현재 분석403.7ms/query active561.8ms와 pool queue 약0.1ms를 구분했고, 제어된100ms hold의 실제 queue/종료/third start도 검증했다. 전체 앱/RSS/Windows 수용으로 일반화하지 않는다. Linux 전체 **322 PASS/0 FAIL/1 Windows batch SKIP(총323개)**·신규6 PASS·runtime/language build. 모든 상한 fallback·native identity/owned output·257/unknown enum 미표시·다른 parameterization ambiguity와 다음 편집 fresh 복구를 통과했다. 다음은 Windows 통합 검증 준비: P0 공식 본체/NTFS/취소·종료→P1 native watcher/한 번의 화면 통합·실제 대표 baseline 순서다. default/candidate/포화 queue·장시간/RSS·전체 disk·미구현 내부 연산/FST/파형 enum 등은 잔여이고 화면은 마지막 통합까지 보류한다. [상세 근거](ide-h7s-lookup-wait.md)·[통합 우선순위](ide-h7-integration-gates.md)·[H7 수용표](ide-h7-acceptance-summary.md). 기존 pinned 도구/변경과 main85ba1fe6f245182faf90602628560cd04f8bcf69 유지·setup 재설치/초안 저장·게시·commit/push·화면 검증은 하지 않았다.
+
+## H7R 최신 — 요청 안에서 package 시작 비용 공유 (2026-10-13 UTC)
+
+기존 pyslang의 auto package dependency와 분석을 한 요청의 Python process에서 이어가되 graph 게시→Core orderPackages 검증→소유 continuation/approval 확인 뒤에만 새 test compilation을 만든다. Core 오류/순서·독립 manager/default/lookup·미저장/신뢰/FS/journal·실제 취소/join/cleanupFailed 보호를 유지하고 상시 worker/cache·자체 compiler/simulator는 만들지 않았다. 300 RTL/package/tests의 Python 시작2→1, 실제 IPC startup/edit4→2·전후5회 semantic/hierarchy20쌍 JSON 일치다. 이번 Linux IPC 편집→완성 중앙값1779.0→900.5ms, 공유 완성899.1→756.4ms를 관찰했다. shared Node CPU29.5→46.1ms·Python peak40.6→41.2MiB도 기록하며 전체 앱 지연/RSS 수용으로 일반화하지 않는다. Linux 전체 **316 PASS/0 FAIL/1 Windows batch SKIP(총317개)**·최종 관련19 PASS·runtime/language build. 승인 전/후 취소·조기/다른 응답·atomic 쓰기 실패·실제15초 승인 누락/종료·fresh 복구를 확인했다. 내부 연산 조회의 Python adapter 부재는 기존 미구현 잔여이며 hierarchy 수용과 구분한다. 다음 H7S는 default/완성 lookup CPU·실제 요청 대기 분리와 H7 성능 잔여/최종 Windows 통합 우선순위 정리다. Windows 공식 본체/native watcher/client/NTFS 파일 왕복/taskkill/화면·대표 설계/장시간/RSS/전체 disk gate는 잔여이고 화면은 마지막 통합까지 보류한다. [상세 근거](ide-h7r-package-session.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). 기존 pinned 도구/변경과 main85ba1fe6f245182faf90602628560cd04f8bcf69 유지·setup 재설치/초안 저장·게시·commit/push·화면 검증은 하지 않았다.
+
+## H7Q 최신 — 독립 테스트 완성 비교·scope 좌표 비용 (2026-10-13 UTC)
+
+기존 pyslang 연동의 전체 symbol JSON 교집합을 순서·중복·타입/선언/default/enum/callable 동의 그대로 선형 비교하고, query 파일 밖 scope의 불필요한 end 좌표 계산을 줄였다. 자체 compiler/simulator 개발은 아니다. 실제300 RTL의 symbol 직렬화93,326→608회, 큰 공유 완성5회 Node CPU 중앙값319.9→33.7ms·wall1158.5→865.8ms·semantic/hierarchy20쌍 JSON 일치다. wall 편차와 작은 IPC 편집→완성1277.2→1472.2ms를 기록하며 전체 지연/RSS 개선으로 판정하지 않는다. Linux 전체 **310 PASS/0 FAIL/1 Windows batch SKIP(총311개)**·기존43/새guard3 PASS·runtime/language build. Core package 오류의 분석 전 거절·취소/실제 process join/임시 파일 회수·원본/신뢰/FS/journal 보호를 유지했다. 별도 package process/import 비용은 남으며 다음 H7R은 Core 검증 뒤 분석하는 요청 내 양방향 protocol과 취소/정리 경계다. Windows 공식 본체/native watcher/client/화면·대표 설계/장시간/RSS/전체 disk gate는 잔여이고 화면은 마지막 통합까지 보류한다. [상세 근거](ide-h7q-semantic-agreement.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). 기존 pinned 도구/변경과 main85ba1fe6f245182faf90602628560cd04f8bcf69 유지·setup 재설치/초안 저장·게시·commit/push·화면 검증은 하지 않았다.
+
+## H7P 최신 — pyslang 연동 경로·위치 계산 비용 (2026-10-13 UTC)
+
+기존 pyslang bridge의 완성 호출 안에서 canonical 경로를 재사용하고, 같은 SourceManager의 UTF-8→UTF-16 좌표를 최대4MiB payload/64 buffer/4096 point로 재사용한다. 다음 요청/independent test에는 공유하지 않고 source/파일·Core·journal 검증과 의미 lookup/default·실제 취소/cleanup은 유지한다. 자체 compiler/simulator 개발은 아니다. 실제 Python helper lstat14675→9763/테스트,300 RTL+대형 Unicode/ports/선언의 공유 완성5회 중앙값1417.6→991.9ms·completion CPU556.5→224.1ms·분석/완성/hierarchy20쌍 JSON hash 일치를 확인했다. 작은 IPC 지연 개선과 전체 RSS 감소는 확인하지 않았다. Linux 전체 **307 PASS/0 FAIL/1 Windows batch SKIP(총308개)**·기존39/새guard4 PASS·runtime/language build. 좌표 전체 byte/BOM/CRLF/astral·상한 fallback·fresh manager/overlay·alias retarget과 복구/정리/원본 보존을 통과했다. 다음 H7Q는 pyslang 연동의 별도 package 시작·default/완성 traversal/lookup·실제 요청 대기 비용이다. Windows 공식 본체/native watcher/client/화면·대표 설계/장시간/RSS/전체 disk gate 유지·화면은 마지막 통합으로 보류한다. [상세 근거](ide-h7p-pyslang-positions.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). 기존 변경/pinned 도구/main85ba1fe6f245182faf90602628560cd04f8bcf69 유지·setup 재설치/초안 변경·게시·commit/push·화면 검증은 하지 않았다.
+
+## H7O 최신 — 미설정 폴더 재검사·inline macro 문맥 (2026-10-13 UTC)
+
+실제 read/lstat 부재만 ProjectManifestMissing으로 분류하고 missing root의 source/peer 이벤트 재검사를 멈췄다. root/parent shallow 복구 감시와 등록 뒤 재읽기·manifest/journal/ancestor 복구를 유지하며 malformed/include/source ENOENT는 보수적으로 처리한다. inline object/function macro 뒤 실제 compiler 기반 signal/package/서명 완성을 복구하고 directive/argument·block/template 보호를 유지했다. plaintext static header의 미저장 복원도 통과했다. Linux 전체 **303 PASS/0 FAIL/1 Windows batch SKIP(총304개)**·최종guard28 PASS·초기관련59 PASS·runtime/language build. actual IPC의 missing unrelated read1→0·mixed read2→1과 baseline inline query 미실행→fresh symbol을 확인했다. 최초 recovery watch 확인 read 비용과 새로 정상 실행되는 query 시간을 latency 개선으로 표현하지 않는다. 다음 H7P는 compiler point/path·default signature/완성 traversal와 별도 package 시작 비용이다. Windows 공식 본체/실제 watcher/client/화면·대표 설계/RSS/전체 disk gate를 유지하고 화면은 마지막 통합으로 보류한다. [상세 근거](ide-h7o-semantic-context.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). 기존 변경과 pinned 환경/main85ba1fe6f245182faf90602628560cd04f8bcf69를 확인했다. setup 재설치/초안 변경·게시·commit/push·화면 검증은 하지 않았다.
+
+## H7N 최신 — 요청 안에서 컴파일러 시작 비용 공유 (2026-10-13 UTC)
+
+독립 테스트를 한 요청의 Python 프로세스에서 순차 분석하여 시작/import만 공유한다. 각 compilation·macro/header·같은 top의 격리와 공유 RTL 완성 교집합, 자동 package 검증·미저장/FS/journal·취소/실제 cleanup을 유지했다. 300 RTL/package/테스트2개에서 provider launch3→2, actual IPC 편집→완성6→4를 확인했다. Linux 전체 **293 PASS/0 FAIL/1 Windows batch SKIP(총294개)**·관련33 PASS·runtime/language build. incomplete batch 거절·두 번째 group 중 취소/retry·manifest 생성/오류 복구와 idle/status 추가 load/compiler0도 통과했다. 지연 변동과 Python peak RSS를 별도 기록하며 모든 응답/앱 메모리 개선으로 판정하지 않는다. 다음 H7O는 미설정 manifest의 typed 분류·안전한 복구 감시와 inline macro 뒤 code completion 제한, package/default/완성 비용이다. Windows 공식 본체/실제 watcher/client/화면·실제 설계/RSS/전체 disk gate 유지·화면은 마지막 통합으로 보류한다. [상세 근거](ide-h7n-semantic-request.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). 기존 pinned 도구/이전 변경과 main85ba1fe6f245182faf90602628560cd04f8bcf69를 확인했다. setup 재설치/초안 변경·게시·commit/push·화면 검증은 하지 않았다.
+
+## H7M 최신 — 소스 범위별 분석·감시 비용 (2026-10-13 UTC)
+
+validated source prefix(package/test/literal/external 포함)로 healthy root의 파일/편집 이벤트를 좁히고, 기존 RTL watcher가 덮는 경로의 dynamic 등록과 recursive parent 아래 중복을 제거했다. 신규 감시 확인 read는 자기 root의 nonempty 감시 변경에만 적용하며 include/journal·unknown/error 안전성을 유지한다. actual IPC/Python 3 roots×300 RTL(900개)/3회에서 startup compilation6→3·local edit/100 notifications3→1·normal dynamic900→0(unknown peak 약903→4), shared header3→실제2 roots, unconfigured/generated/status 이벤트 추가분석0을 확인했다. 외부 glob 누락 뒤 생성·비RTL source 구성·held peer query 유지와 watch ack 뒤 old error 상태 차단도 통과했다. 288 PASS/0 FAIL/1 Windows batch SKIP(총289개, 순차 전체)·관련25 PASS/최종guard23 PASS·runtime/language build. CPU/작업 수 감소를 모든 응답 지연 개선으로 판정하지 않는다. 다음 H7N은 compiler 시작/parse/elaboration·package/test와 편집→완성 대기 경로, mixed/error root idle 비용 분리다. Windows native watcher/LanguageClient/host·공식 본체/화면·실제 설계/RSS/전체 disk gate는 잔여다. [상세 근거](ide-h7m-semantic-scale.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). 기존 pinned 도구/기존 변경 보존·GitHub main/HEAD85ba1fe6f245182faf90602628560cd04f8bcf69 확인. setup 재설치/초안 변경·게시·commit/push·화면 검증은 하지 않았다.
+
+## H7L 최신 — 실제 입력·파일 감시·설정 복구 무효화 (2026-10-13)
+
+컴파일러가 실제로 읽은 source/header와 expanded include·누락 후보를 추적하고, 확인된 입력 밖의 generated 이벤트만 제외한다. 비RTL·외부 include의 directory 감시를 표준 LSP 등록/해제 ack로 관리하고 신규 감시 뒤 재읽기한 결과만 게시한다. 동일 실제 IPC/Python fixture의 generated100개 추가분석1→0, .inc WIDTH4→8의 기존 stale3:0→갱신7:0, previous.toml 변경 뒤 기존 stale Ready→Analysis failed/복구 전 query 차단을 확인했다. 실제2 roots 공유 header 갱신·root 제거 감시 해제·late old-handle held query 취소/명시적 recovery·drain cache/live0도 통과했다. 이전 headless의 workspaceFolders capability 누락을 바로잡아 remove/add 경계를 다시 검증했다. 278 PASS/0 FAIL/1 Windows batch SKIP(총279개, 순차 전체)·관련16 PASS·runtime/language build. 일반 RTL 이벤트는 공유/glob 안전성을 위해 여전히 all-root이며 새 의존성 감시 발견 시 확인용 compilation 비용이 있다. 다음 H7M은 수백 RTL 규모의 감시/재분석 비용과 일반 이벤트 root 범위다. Windows 실제 watcher/LanguageClient/host·공식 본체/화면·실제 설계/RSS/전체 disk gate는 잔여다. [상세 근거](ide-h7l-semantic-inputs.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). 복원된 Node24.19.0/Python3.12.14/pyslang11.0.0/Verilator5.032와 기존 변경을 확인했다. GitHub main은85ba1fe6f245182faf90602628560cd04f8bcf69로 work 기준과 같았다. 기존 setup 초안을 다시 쓰거나 게시했다고 주장하지 않으며 commit/push·화면 검증은 하지 않았다.
+
+## H7K 최신 — 언어 서비스 재시작·idle·종료 확인 (2026-10-13)
+
+최신 요청 하나로 runtime probe/restart를 모으고 실제 취소/정리 뒤에만 replacement한다. 상태 bar는 조회1개·완료 뒤1500ms·focus/RTL 가드로 바꿨다. actual adapter/API 모델20 restart의 probe/client20→1, held probe21→2/최종client21→1, slow status11→1을 확인했다. prepareShutdown의 provider join→native stop→소유 IPC parent close를 사용하고 불확실한 cleanup/stop/disconnect는 quarantine·자동/수동 새 시작 거절한다. 이전/expected-close callback은 새 client를 막지 않는다. 실제 runtime probe/Node IPC/Python4 exit·drain cache/live0·포함한 .rtl header3:0→7:0/원본 불변을 확인했다. 264 PASS/0 FAIL/1 Windows batch SKIP(총265개, 순차 전체)·관련51 PASS·최종 신규18 PASS·runtime/language build. Generated notification100개는 여전히추가분석1회여서 다음 H7L에서 실제 입력 의존성/파일 이벤트·journal 무효화 범위를 확인한다. Windows/Electron 실제 client/host 종료·공식 본체/화면·실제 설계/RSS/전체 disk gate는 잔여다. [상세 근거](ide-h7k-language-lifecycle.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). read-only GitHub main 확인은85ba1fe6f245182faf90602628560cd04f8bcf69로 work 기준과 같다. 기존 변경을 보존하고 commit/push·앱 화면 검증은 하지 않았다.
+
+## H7J 최신 — 언어 분석 burst·공유·종료 (2026-10-13)
+
+언어 서버 provider 작업을2 active/32 대기로 제한하고 root/generation/exact query의 동시 요청만 공유한다. caller별 취소·마지막 caller 취소 뒤 실제 cleanup slot 유지·stale 결과 차단·close join·cleanup 실패 quarantine을 적용했다. 실제 stdio LSP/Python에서3 roots/100 watch/20 concurrent query의 초기 실제 query20→1, held root process3→2·원본/unsaved/peer 취소/새 요청 재분석·root remove/add·종료 cache0을 확인했다. 기존 debounce의 초기 root 분석3회는 양쪽 동일하다. 이전 종료 응답 뒤 temp3 잔류 FAIL을 재현했고 transient capacity는 새 편집 없는 on-demand 재시도로 복구한다. 246 PASS/0 FAIL/1 Windows SKIP(총247개: 전체246개 + 최종 신규capacity1개 분리 검증)·최종 관련35 PASS·runtime/language build. 다음 H7K는 언어 서비스 시작/재시작·idle/generated 이벤트 비용이다. Windows LanguageClient stop/IPC/taskkill·공식 본체/앱·실제 설계/RSS/전체 archive disk gate는 잔여이며 화면 검증은 보류한다. [상세 근거](ide-h7j-semantic-burst.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). read-only GitHub main 재확인은85ba1fe6f245182faf90602628560cd04f8bcf69로 work 기준과 같다. 기존 변경을 보존하고 commit/push·화면 검증은 하지 않았다.
+
+## H7I 최신 — 반복 설정 검사 비용·성능 요구 (2026-10-13)
+
+요청 내 검증한 설정 snapshot을 parser와 최종 게시 검사에 공유해 반복 저장 전체 scan7→3회/current 읽기18→7회·고정1MiB 버퍼 제거를 구현했다. SHA/경로·membership/short read·late old-handle/실제 crash·lease/recovery·abort/join을 유지한다. 동일96개/67KB 합성 fixture3회에서 저장 중앙값1270→662ms·읽은 bytes91.7→39.3MB·file open2716→1169, 신규 회귀의 이전 코드3 FAIL/3 PASS를 재현했다. 238 PASS/0 FAIL/1 Windows batch SKIP(총239개, 순차 전체)·runtime/language build·최종 신규7 PASS·writer protected true/exit0. 실제160회 저장/주기적 retirement도 PASS(이번 약110초; 과거252초와 별도 실행 관측). 가볍고 빠른 VS Code/PyCharm 느낌을 제품 요구와 성능 계획에 기록했다. 다음 H7J는 파일 이벤트/의미 분석 요청 burst·중복 작업과 취소/갱신을 headless로 점검한다. Windows 공식 본체/NTFS/앱 화면·실제 설계/RSS·전체 archive disk gate는 잔여다. [상세 근거](ide-h7i-import-save-cost.md)·[H7 수용표](ide-h7-acceptance-summary.md)·[성능 계획](ide-performance-plan.md). read-only GitHub main 재확인은85ba1fe6f245182faf90602628560cd04f8bcf69로 work 기준과 같다. 기존 변경을 보존하고 push/commit·화면 검증은 하지 않았다.
+
+## H7H 최신 — 설정 기록 별도 보관·조회 비용 (2026-10-13)
+
+명시적 검토·확인 뒤 오래된 정상 설정 기록을 별도 보관하고 최근32개·pending/unknown 기록은 active에 유지한다. 현재 설정·파일 bytes/inode를 보존하며 archived 기록은 자동 변경 검사에서 제외한다는 정책을 UI에 설명한다. 128개 중96개 보관→다음 저장과 실제160회 저장·partial abort/crash/fresh retry·close join을 통과했다. 요청 내 current2회/8개 병렬 검증으로 같은128개 합성 기록의 bytes25.8→17.3MB·중앙값2440→272ms를 관찰했다. 231 PASS/0 FAIL/1 Windows SKIP(총232개: 전체 본체230개 + 최종 신규guard2개 분리 검증)·최종 관련30 PASS·runtime/language build. Windows case-only realpath와 invalid UUID temp2 FAIL을 재현해 보완했고 Windows 실제 파일/화면 수용은 미실행이다. 자동 삭제·전체 disk cap은 없다. 다음 H7I는 반복 저장 guard/scan 중복 비용 분리와 안정화 잔여 수용표다. RSS/실제 설계·Windows 공식 본체/NTFS/물리 통합 gate를 유지한다. [상세 근거](ide-h7h-import-journal.md). 이번 read-only GitHub main 재확인도85ba1fe6f245182faf90602628560cd04f8bcf69이며 기존 작업 공간 변경을 보존했다. push/commit·화면 검증은 하지 않았다.
+
+## H7G 최신 — 설정 게시 후보 보존·명시적 복구 (2026-10-12)
+
+외부 writer의 마지막 변경을 포착해 현재/이전/요청한 설정을 journal에 보존하고, 비어 있는 경로에만 게시한다. 중단·충돌 후보는 자동 채택하지 않고 설정 복구에서 읽기 전용 비교 후 명시적으로 선택한다. old open handle 지연 쓰기·실제 capture/link/commit crash4경계·복구 자체 경합·stale/readonly/BOM·읽기 중 게시 중단 차단을 확인했다. 보관 이력/로그/source/파형을 유지하고 현재 설정이 유효하면 복구 후 Run을 해제한다. 관련43 PASS·overlay3 PASS·Git HEAD의 실제 owned3파일 migration PASS·Linux 전체215 PASS/0 FAIL/1 Windows batch SKIP(총216)·runtime/language build. H7F의 외부 bytes overwrite FAIL 진단은 H7G 재실행에서 protected true/저장 거절/세 후보 확인 PASS/exit0이다. 다음 H7H는 journal 보관량·반복 저장/조회 비용과 장기 사용 정책이다. 현재128 transaction gate·자동 prune 없음·전체 scan 한계, RSS/실제 설계·Windows 공식 본체/NTFS/실제 복구 UI·물리 통합은 잔여다. [상세 근거](ide-h7g-import-publication.md). 이번 read-only GitHub main 재확인도85ba1fe6f245182faf90602628560cd04f8bcf69로 기존 work 기준과 같았다. 구현 변경은 작업 공간에 보존하며 push/commit을 수행하지 않았다.
 
 ## 1. 반드시 먼저 알아야 할 것
 
@@ -25,7 +95,7 @@
 
 ## 3. 사용자가 원하는 스타일
 
-**엔지니어가 코드를 쓰고 실행·관측하는 데 집중하게 하며, IDE 설정을 배우게 하지 않는다.** 깔끔한 VS Code 느낌, 가벼운 화면, 눈에 보이는 명시적 버튼, 기능별 자연스러운 위치가 중요하다.
+**엔지니어가 코드를 쓰고 실행·관측하는 데 집중하게 하며, IDE 설정을 배우게 하지 않는다.** 사용자 추가 요구(2026-10-13)는 **VS Code/PyCharm처럼 가볍고 빠른 반응**이다. 불필요한 I/O/background/메모리·process 사용을 줄이고 실제 병목을 계측한다. [성능 계획](ide-performance-plan.md)을 유지한다. 깔끔한 VS Code 느낌, 가벼운 화면, 눈에 보이는 명시적 버튼, 기능별 자연스러운 위치가 중요하다.
 
 - Command Palette나 단축키 암기를 기본 사용 흐름으로 삼지 않는다. 키보드 실행은 보조로 지원한다.
 - 같은 기능의 버튼을 여러 곳에 늘려 복잡하게 만들지 않는다. 진행/결과/경고는 작고 명확하게 표현하고 반복 팝업은 피한다.
@@ -121,7 +191,7 @@ Diagram의 의도는 hierarchy tree만이 아닌 회로/schematic/architecture c
 | H6B1/B2/B3 | 기존 파일 미저장 실행 snapshot·동결·GUI 연결·saved/current 비교·package/header/BOM·재시작 보존 수용 |
 | H6C | run별 보관 RTL/package/header 가상 읽기 전용 Code 탭·UTF8/hash 검증·삭제 원본 대응 |
 | H6D | 선택한 과거 run 명시적 입력 비교, 편집 후 무효화, 보관/현재 소스 diff·삭제 파일 무생성 |
-| H7 | 다음 안정화 단계. 전체 완료/수용 근거는 아직 없음 |
+| H7 | H7A～J 뒤 H7K 최신 probe/restart·status1개/focus·IPC drain/parent close·cleanup quarantine·late callback 보호. 264 PASS/0 FAIL/1 Windows batch SKIP(총265개, 순차 전체). 다음 H7L 실제 입력/파일 이벤트/journal 무효화·generated 비용. Windows/Electron/client host 종료·공식/앱·실제 설계/RSS/disk 잔여 ([수용표](ide-h7-acceptance-summary.md), [성능 계획](ide-performance-plan.md)) |
 
 최신 Windows 개발 환경 근거: **145 PASS / 0 FAIL / 0 SKIP**, runtime/language build, 공식 본체 TS7 전체 타입 0 errors, 공식 emission 3파일 0 errors. H6D trusted native 4시나리오 PASS: 과거 matching→dirty 무효화/changed→실제 diff/삭제 package 거절→복구 matching. 최신 결과/history29/원형 보존, 새 simulation 없음.
 
@@ -129,14 +199,14 @@ Diagram의 의도는 hierarchy tree만이 아닌 회로/schematic/architecture c
 
 ## 11. 클라우드 준비에서 실제로 주의할 제약
 
-현재 저장소를 **클라우드에서 그대로 전체 빌드/시험 가능하다고 검증하지 않았다.** 런타임 분리 구조가 Linux에서 Windows 앱 수용을 보장하지 않는다.
+위의 Linux runtime/language 빌드·자동 회귀와 실제 counter 시뮬레이션은 확인했다. **Windows Code-OSS 전체 native 빌드/시험은 클라우드에서 검증하지 않았다.** 런타임 분리 구조가 Linux에서 Windows 앱 수용을 보장하지 않는다.
 
 - Git에 포함: root 문서/AGENTS, ide 소유 src/runtime/language/config/scripts/tests/examples/lock/license, 유지할 vsix 코드. 제외: node_modules/dist/out, `ide/upstream`, `.dev`, `.rtl`, 설치 도구, 사용자 profile/trust/secrets.
 - 로컬 작업 경로 `D:\Dev\verilog_ide`는 설명용이다. 클라우드 repo root를 감지하고 상대 경로로 작업한다.
 - `ide/scripts/bootstrap.ps1`, `environment.mjs`, `dev.mjs`, launcher는 Windows x64/MSVC/배치 중심이다. Linux cloud에서 doctor가 실패하는 것은 예상 환경 제약이며 guard를 삭제해 통과시키지 않는다.
 - upstream은 `upstream.json`의 공식 archive/revision/hash/lock 기준으로 재구성한다. 독립 Git metadata와 pinned HEAD 필요. 클라우드용 준비가 필요하면 ide 안의 별도 작은 script/문서로 지원하고 Windows bootstrap은 보존한다. source baseline/version을 편의상 바꾸지 않는다.
 - Node는 pinned 24.18.0 기준을 확인한다. ide 자체는 `npm ci`와 `npm run build:runtime`, `npm run build:language`가 시작점이다. lockfile을 자동 갱신하지 않는다.
-- 전체 `npm test`는 pretest로 두 build 후 tests를 실행한다. 일부 semantic/import 관리 시험은 로컬 `.rtl-dev/tools/slang-11.0.0-python-3.14.7/python.exe` 경로를 사용한다. `semantic.test.mjs`에는 `RTL_SEMANTIC_PYTHON`이 있지만 모든 시험이 이를 사용하는 것은 아니다. Cloud용 verified slang runtime/경로 주입을 먼저 점검해야 한다.
+- 전체 `npm test`는 pretest로 두 build 후 tests를 실행한다. H7F의 cgroup4 CPU에서 기본 병렬 전체가 deadline/semantic timeout을 만나 분리 재검증 후 runtime/language build + `node --test --test-concurrency=2 tests/*.test.mjs`로197개 전체를 완료했다. H7G의 concurrency2 전체는 기존 slang completion15초 제한의 Cancelled1 FAIL을 만나 해당 semantic suite를 단독 재검증했다. 최종 H7G는 runtime/language build 뒤 `node --test --test-concurrency=1 tests/*.test.mjs`로216개 전체를 완료했다. Linux에서는 기본 병렬을 피하고 제한된 병렬/필요 시 serial을 사용하며 제품/시험 timeout이나 skip을 늘리지 않는다. 일부 semantic/import 관리 시험은 로컬 `.rtl-dev/tools/slang-11.0.0-python-3.14.7/python.exe` 경로를 사용한다. `semantic.test.mjs`에는 `RTL_SEMANTIC_PYTHON`이 있지만 모든 시험이 이를 사용하는 것은 아니다. Cloud용 verified slang runtime/경로 주입을 먼저 점검해야 한다.
 - 로컬 사용 도구: Verilator 5.050/MSYS2 UCRT64/GCC16, slang11.0.0/Python3.14.7. 이 Windows executable을 Linux에서 사용하지 않는다. cloud simulator/frontend 설치·버전·지원 범위를 별도로 기록한다.
 - 전체 시험이 준비되지 않았다면 가능한 순수 시험을 명시적 목록으로 수행하고 전체 미실행 원인을 남긴다. 의존성을 제거/가짜 성공/조용한 skip으로 기존 검증 요구를 낮추지 않는다.
 - Windows batch/path/process-tree/설치 검증과 physical UI는 Windows 재확인 대상이다. POSIX 대소문자/프로세스 동작을 Windows 규약으로 바꾸지 않는다.
@@ -146,12 +216,12 @@ Diagram의 의도는 hierarchy tree만이 아닌 회로/schematic/architecture c
 ## 12. 다음 작업 순서와 열린 항목
 
 1. Cloud 작업 준비: 현재 commit/파일/lock 확인, 사용 가능한 OS/Node/도구 확인, 가능한 build/test 실행과 불가능한 항목 기록. 준비가 기존 제품 기능을 바꾸는 큰 작업으로 번지지 않게 한다.
-2. **H6 acceptance matrix를 한 번 정리하고 범위 판정.** 자동 trace·미저장 snapshot·비교·보관/diff의 완료 근거와 잔여를 묶는다. H6 기능을 끝없이 추가하지 않는다.
-3. **H7 안정화:** 중간 규모 비교/스캔/보관 읽기 비용, 시작/편집/파형 메모리, 취소·종료 child cleanup, 공간/탭/이력 복원, 손상/삭제 기록 회복을 측정하고 필요한 보완.
+2. **H6 기본 경로 판정 완료.** [수용표](ide-h6-acceptance-summary.md)에 자동 trace·미저장 snapshot·비교·보관/diff와 잔여 gate를 묶었다. H6 기능을 끝없이 추가하지 않는다.
+3. **H7 안정화:** H7A～J 뒤 H7K probe/restart 최신 요청·status1개/focus·prepareShutdown/provider join/소유 IPC parent close·cleanup quarantine·late callback 보호를 확인했다. 다음 H7L은 실제 입력 의존성과 파일 이벤트/journal 무효화 범위·generated 이벤트 비용이다. [H7 수용표](ide-h7-acceptance-summary.md), [성능 계획](ide-performance-plan.md)을 따른다. .rtl의 포함 header가 실제 입력일 수 있으므로 폴더 이름으로 무조건 제외하지 않는다. Windows/Electron 실제 LanguageClient/host 종료 deadline·taskkill/신뢰·공식 본체/NTFS/UI·실제 설계/RSS/전체 archive disk는 잔여다.
 4. 비UTF8/untitled/deleted/foreign source 경계, 외부 writer/crash·빠른 root/선택/편집 race를 검증 가능한 범위부터 정리한다.
 5. 남은 실제 화면 체크리스트를 누적 → 마지막 Windows 통합 세션 → 필요한 수정과 관련 회귀. 이후 사용 수용/배포는 사용자 판단에 따른다.
 
-현재 알려진 제한: 보관 source UTF8·64MiB 창 cache(한도/eviction 평가 필요), history 기본 최근100(확장 읽기 최대1000), saved/current 비교 비용·전체 filesystem atomic snapshot 아님·tool environment 동일성 보증 아님. FST 내장 표시/enum 미연결. UI 요청 도중 물리 race/DPI/긴 시간·그룹 drag 등 종합 재수용이 남는다.
+현재 알려진 제한: H7H active128 상한·명시적 정상32 유지/별도 보관·archived 자동 감시 제외·전체 disk cap 없음·H7I scan 공유/H7J LSP2/32 및 in-flight 공유 후 config·all-root/settled query/package compilation·H7K 최신 probe/status single/focus·IPC 종료 확인 후 generated/실제 dependencies·native startup/idle 비용 잔여, 보관 source UTF8·64MiB/256 entries 창 LRU cache(model 제거/project 전환/dispose 해제 구현; 전체 model/IPC 메모리 한도 아님·Windows 실제 해제 수용 필요), history 기본 최근100(확장 읽기 최대1000), saved/current 비교 비용·전체 filesystem atomic snapshot 아님·tool environment 동일성 보증 아님. FST 내장 표시/enum 미연결. UI 요청 도중 물리 race/DPI/긴 시간·그룹 drag 등 종합 재수용이 남는다.
 
 별도 깨끗한 Windows PC/VM은 **현재 사용자에게 없음**. 설치 승인→다운로드/pacman 서명→실행→파형 종단 및 network/retry/reuse 전 범위 검증을 완료라고 선언하지 않는다. 현재 도구 재사용 검증은 새 환경 설치 검증과 다르다. 확보 전에도 다른 구현/검증은 진행 가능하다.
 

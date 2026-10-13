@@ -59,7 +59,9 @@ test('actual slang management adds/removes tops, rediscovers sources/packages/he
   await host.refreshInputs();
   assert.equal(host.state.sourceSync.state, 'changed');
   assert.ok(host.state.sourceSync.added.includes('rtl/helper.sv'));
-  assert.ok(host.state.sourceSync.candidates.some(name => name.endsWith('.third')));
+  // A folder TB is now registered by discovery, without waiting for Apply.
+  const thirdName = host.state.tests.find(test => test.top === 'third').name;
+  assert.ok(!host.state.sourceSync.candidates.some(name => name.endsWith('.third')));
   assert.deepEqual(await fs.readFile(path.join(dir, 'rtl.toml')), before);
   await assert.rejects(host.manageProject(false), /신뢰/);
   await host.manageProject(true); assert.ok(host.state.review.execution);
@@ -71,7 +73,7 @@ test('actual slang management adds/removes tops, rediscovers sources/packages/he
   const reopened = new SimulationHostSession(() => {}); t.after(() => reopened.close());
   await reopened.inspect(dir);
   assert.deepEqual(reopened.state.savedFolderRoles, host.state.savedFolderRoles);
-  assert.deepEqual(host.state.tests.map(test => test.name), ['tb.first','tb.third']);
+  assert.deepEqual(host.state.tests.map(test => test.name), ['tb.first',thirdName]);
   assert.equal(host.state.tests[0].latest.runId, oldRun);
   assert.equal(host.state.history[0].runId, oldRun);
   const project = await loadProject(dir);
@@ -80,7 +82,7 @@ test('actual slang management adds/removes tops, rediscovers sources/packages/he
   assert.equal(project.defines.FEATURE, '1'); assert.ok(project.includeDirs.some(file => file.endsWith('rtl')));
   const cli = spawnSync(process.execPath, [path.join(root, 'scripts/rtl.mjs'), 'check'], { cwd: dir, encoding: 'utf8' });
   assert.equal(cli.status, 0, cli.stderr);
-  assert.deepEqual(JSON.parse(cli.stdout).tests.map(test => test.name), ['tb.first','tb.third']);
+  assert.deepEqual(JSON.parse(cli.stdout).tests.map(test => test.name), ['tb.first',thirdName]);
   await host.manageProject(true); await host.confirmReview({ ids: [] }, true);
   assert.equal(host.state.error, undefined); assert.equal(host.state.tests.length, 0);
   assert.equal((await readImportedExecution(dir)).preview.tests.length, 0);
@@ -101,13 +103,13 @@ test('manual/ordinary manifests, stale revision and compiler failure never get o
   assert.equal(await fs.readFile(file, 'utf8'), bytes.toString() + '# user edit\n');
   await host.inspect(dir); await host.manageProject(true); assert.ok(host.state.error); assert.equal(host.state.review, undefined);
   await host.refreshInputs(); assert.equal(host.state.sourceSync.state, 'unavailable');
-  assert.equal(host.state.savedFolderRoles, undefined);
+  assert.deepEqual(host.state.savedFolderRoles.folders, [{ path: 'verification', role: 'simulation' }]);
   assert.equal(await fs.readFile(file, 'utf8'), bytes.toString() + '# user edit\n');
   await fs.writeFile(file, bytes.toString().replace('# RTL IDE imported execution project v1\n', ''));
   await host.inspect(dir); await host.manageProject(true); assert.match(host.state.error, /보존/);
   assert.equal(host.state.review, undefined);
   await host.refreshInputs(); assert.equal(host.state.sourceSync.state, 'protected');
-  assert.equal(host.state.savedFolderRoles, undefined);
+  assert.deepEqual(host.state.savedFolderRoles.folders, [{ path: 'verification', role: 'simulation' }]);
   assert.deepEqual((await fs.readdir(path.join(dir, '.rtl'))).filter(file => file.endsWith('.lock') || file.endsWith('.tmp')), []);
 });
 test('management repairs a deleted registered source and keeps existing test identity when a basename collision appears', async t => {
@@ -120,10 +122,10 @@ test('management repairs a deleted registered source and keeps existing test ide
   assert.ok(host.state.tests.some(test => test.name === 'tb.first'));
   const additional = host.state.tests.find(test => test.name !== 'tb.first'); assert.match(additional.name, /^tb.first-/);
   await fs.unlink(path.join(dir, 'verification/tb.sv'));
-  await host.refreshInputs(); assert.equal(host.state.sourceSync.state, 'changed');
-  assert.ok(host.state.sourceSync.removed.some(file => file.includes('verification/tb.sv')));
-  await host.inspect(dir); assert.equal(host.state.phase, 'error');
-  assert.equal(host.state.sourceSync.state, 'changed');
+  await host.refreshInputs(); assert.equal(host.state.sourceSync.state, 'matching');
+  assert.ok(!host.state.tests.some(test => test.name === 'tb.first'));
+  await host.inspect(dir); assert.equal(host.state.phase, 'idle');
+  assert.equal(host.state.sourceSync.state, 'matching');
   await host.manageProject(true); assert.ok(host.state.review.execution);
   await host.confirmReview(selected(host, ['first']), true); assert.equal(host.state.error, undefined);
   assert.equal(host.state.tests.length, 1); assert.equal(host.state.tests[0].name, additional.name);

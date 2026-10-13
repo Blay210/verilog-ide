@@ -2,17 +2,36 @@
   {
     "source": "src/rtlSpaces.contribution.ts",
     "target": "src/vs/workbench/contrib/rtl/browser/rtlSpaces.contribution.ts",
-    "previousSha256": "76fa9ee78f2842f816761fbf8ab98e3f9e8ab961248cb4e7fa713fd27fa61fef"
+    "previousSha256": "76fa9ee78f2842f816761fbf8ab98e3f9e8ab961248cb4e7fa713fd27fa61fef",
+    "previousSha256s": [
+      "695dd57691c0c1e2daaf82ea51caac279551d0f394fa63d3293f7faf5b855fa7",
+      "e9d0b6b04479d8ff4c1bb9e7fd9b4e476204c4441b8f96e2c5a92f1d58e1b115"
+    ]
   },
   {
     "source": "src/rtlSimulationHome.ts",
     "target": "src/vs/workbench/contrib/rtl/browser/rtlSimulationHome.ts",
-    "previousSha256": "d0fad024c59267a76b6d0b9f1d5b8e7557294bfb461abcc8b2a1f91addbf56b2"
+    "previousSha256": "f8593d79bb2a0c5dd60818cab44050bb083c758dff843eae43c063dad9ddccd8",
+    "previousSha256s": [
+      "6fc206f3733282eddca962b21f9b26b825dcc6c9b2f93f9c4a8bf8acbf3f48aa",
+      "de83174f50ab48f644f4d8696066ee10b2fc7f31b7b262dc40443884eea26e9e",
+      "22c92ef1ed8d301cc4611e5d9705d3703d9eb5b15beb466d6e0967ca66168cf4",
+      "8f480c8dd819e76ae02011719a087e61d6f13823b6cbe240c96ce4a23bf3d8bb",
+      "f047659e1b43d9c96568c6650d089d17a28def2b105911b49b54c49d90b668c8",
+      "69f86f2e93f35e8297278dc6824361b66d20b58c5946c40f9caf3c647c6f3a80",
+      "b5e78d99410da54424d6f72abbe59316b9b7fdf2f8b6830835c4f8eb8bb16c38",
+      "59bfca818b7d333d70336dfc6e5c0852c90246ea5d998c1433fc496f0afedec6"
+    ]
   },
   {
     "source": "src/rtlSimulationChannel.ts",
     "target": "src/vs/platform/rtl/node/rtlSimulationChannel.ts",
-    "previousSha256": "92c1186b6c206d485db6f32b44a502d1f352496865844657d0a0963ca59e39b9"
+    "previousSha256": "2e232abe29138862c4705a0ab5470833c15754da17aa64e6ef2ba6d592755af7",
+    "previousSha256s": [
+      "e67d02908b018aec73152a3c11372f38bb3fc41a9504671e3e677d167badad06",
+      "c9a6b6adc1559279c2645e6b229f5a0d5d462a7386da9f4490608b7600b4e341",
+      "77f99562e2a9f62e10f1c3c5fa6da6a1fa83556067226015d43c10fd71b1c593"
+    ]
   },
   {
     "source": "src/rtlRuntime.d.ts",
@@ -22,7 +41,16 @@
   {
     "source": "runtime/contract.ts",
     "target": "src/vs/platform/rtl/common/rtlSimulation.ts",
-    "previousSha256": "1b01976d92cc2e75800f23e52f83b9e57c6ba26e80cab849bc65d41db6842621"
+    "previousSha256": "001f556c8c4c3eab941df645de86abf8854ee6a31da12cff45b96a76a882b6b2",
+    "previousSha256s": [
+      "653acc667715fb0644e121dfb76e75a2f51a74f342c712fd6f88f23fa12a978d",
+      "5498aea961a1e5fb99bbe5b5ad37a21e7b87fa9242549ca77223d150596e9e37",
+      "1fd0f0acb186a72fc8eaf4e9f8cc7809e939dbe1ca3e5ffb8463587afcff5f30"
+    ]
+  },
+  {
+    "source": "runtime/recorded-source-cache.ts",
+    "target": "src/vs/platform/rtl/common/recordedSourceCache.ts"
   },
   {
     "source": "runtime/waveform/model.ts",

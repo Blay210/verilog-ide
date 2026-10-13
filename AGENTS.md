@@ -4,6 +4,8 @@ Read `docs/architecture.md` and the current verification notes before extending 
 
 - The final product is an independent VS Code/Code-OSS-based RTL design and simulation IDE. The VS Code extension is an initial host, not the end product.
 - Help engineers focus on RTL structure. Keep projects source-first, lightweight and easy to put in Git; generated project outputs belong in `.rtl/`, shared tools/caches outside user projects.
+- Treat a light, responsive experience like VS Code/PyCharm as a product requirement (2026-10-13). Measure startup, idle work, editing, project operations and retained waveform/source memory; remove redundant I/O and bound background work/caches. Record representative measurements and remaining bottlenecks in the H7 roadmap; synthetic Linux timings alone do not establish Windows UI responsiveness.
+- Simulation TB folder membership is automatic (2026-10-13): source addition/deletion updates the list only; never automatically compile/run. Persist explicit user exclusions and manual files, recognize separate complete tops in one file, preserve history/source/trace, and share selection in Core/GUI/CLI. See `docs/ide-tb-auto-catalog.md`.
 - Keep Core and language logic independent of VS Code. Keep semantic analysis separate from simulation. GUI and CLI reuse Core behavior.
 - Verilator and GTKWave are initial adapters. Preserve replacement boundaries for dedicated future compiler/simulator and waveform technology; do not prematurely implement a compiler or fork Code-OSS.
 - Follow the incremental roadmap. Basic lexical editing is phase 2A; module/port intelligence through a semantic provider is 2B; package/scope completion is 2C. Do not describe keyword completion as semantic analysis.

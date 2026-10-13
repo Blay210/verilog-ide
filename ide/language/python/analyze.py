@@ -4,8 +4,95 @@ import os
 import sys
 import locale
 import re
+import time
+from array import array
+from bisect import bisect_right
 import pyslang as slang
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+
+class SourcePositions:
+    """Bounded coordinates for one immutable compiler source manager, not files."""
+    def __init__(self, manager, max_bytes=4 * 1024 * 1024, max_buffers=64, max_points=4096):
+        self.manager = manager
+        self.max_bytes, self.max_buffers, self.max_points = max_bytes, max_buffers, max_points
+        self.bytes = 0
+        self.buffers, self.points = {}, {}
+
+    def point(self, location):
+        location = self.manager.getFullyOriginalLoc(location)
+        key = (location.buffer, location.offset)
+        value = self.points.get(key)
+        if value is None:
+            buffer = self.buffers.get(location.buffer)
+            if buffer is None:
+                filename = str(self.manager.getFullPath(location.buffer))
+                text = self.manager.getSourceText(location.buffer)
+                data = text.encode('utf-8')
+                ascii_only = data.isascii()
+                cost = len(data) + (8 if ascii_only else 16) * (data.count(b'\n') + 1)
+                if len(self.buffers) < self.max_buffers and self.bytes + cost <= self.max_bytes:
+                    starts = array('Q', [0])
+                    units = starts if ascii_only else array('Q', [0])
+                    if ascii_only:
+                        starts.extend(match.end() for match in re.finditer(b'\n', data))
+                    else:
+                        previous = byte_offset = unit_offset = 0
+                        for match in re.finditer('\n', text):
+                            line = text[previous:match.end()]
+                            byte_offset += len(line.encode('utf-8'))
+                            unit_offset += len(line.encode('utf-16-le')) // 2
+                            starts.append(byte_offset); units.append(unit_offset)
+                            previous = match.end()
+                    buffer = (filename, data, starts, units, ascii_only)
+                    self.buffers[location.buffer] = buffer
+                    self.bytes += cost
+                else:
+                    # Huge/dense buffers keep the original conversion without
+                    # growing a request cache. Partial UTF-8 uses replacement.
+                    prefix = data[:location.offset].decode('utf-8', errors='replace')
+                    value = (filename, len(prefix.encode('utf-16-le')) // 2,
+                             prefix.count('\n'), len(prefix.rsplit('\n', 1)[-1].encode('utf-16-le')) // 2)
+            if value is None:
+                filename, data, starts, units, ascii_only = buffer
+                offset = min(location.offset, len(data))
+                line = bisect_right(starts, offset) - 1
+                character = offset - starts[line] if ascii_only else len(data[starts[line]:offset].decode('utf-8', errors='replace').encode('utf-16-le')) // 2
+                value = (filename, units[line] + character, line, character)
+            if len(self.points) < self.max_points:
+                self.points[key] = value
+        filename, offset, line, character = value
+        # Callers receive independent dictionaries, as in the original bridge.
+        return {'file': filename, 'offset': offset, 'line': line, 'character': character}
+
+
+class ScopeEnumValues:
+    """Presentation values for exact native enum identities in one lookup scope."""
+    def __init__(self, max_types=64, max_values=4096, max_bytes=1024 * 1024):
+        self.max_types, self.max_values, self.max_bytes = max_types, max_values, max_bytes
+        self.entries = {}
+        self.values = self.bytes = 0
+
+    def get(self, enum_type):
+        row = self.entries.get(id(enum_type))
+        if row is None or row[0] is not enum_type:
+            return None
+        # Every result owns its list/dicts, including callers using the bridge
+        # directly. Keep the native identity alive so Python IDs cannot recycle.
+        return [{'name': name, 'value': value} for name, value in row[1]]
+
+    def put(self, enum_type, values):
+        if id(enum_type) in self.entries or len(self.entries) >= self.max_types or self.values + len(values) > self.max_values:
+            return False
+        size = 0
+        for value in values:
+            size += len(value['name'].encode('utf-8')) + len(value['value'].encode('utf-8'))
+            if self.bytes + size > self.max_bytes:
+                return False
+        self.entries[id(enum_type)] = (enum_type, tuple((value['name'], value['value']) for value in values))
+        self.values += len(values)
+        self.bytes += size
+        return True
 
 
 def dependencies(tree, manager):
@@ -148,12 +235,20 @@ def hierarchy(root, manager, point):
 
 def complete(compilation, defaults, query, manager, point, source_files):
     """Enumerate candidates, but let slang perform visibility/import/name resolution."""
-    filename = os.path.normcase(os.path.realpath(query['file']))
+    paths = {}
+    def canonical(file):
+        if file in paths:
+            return paths[file]
+        value = os.path.normcase(os.path.realpath(file))
+        if len(paths) < 4096:
+            paths[file] = value
+        return value
+    filename = canonical(query['file'])
     offset = query['offset']
     # Overlays include other open tabs too. Only compiled sources and headers that
     # were actually included belong to this compilation's visibility context.
-    known_files = {os.path.normcase(os.path.realpath(file)) for file in source_files}
-    known_files.update(os.path.normcase(os.path.realpath(str(manager.getFullPath(buffer)))) for buffer in manager.getAllBuffers() if manager.getIncludedFrom(buffer))
+    known_files = {canonical(file) for file in source_files}
+    known_files.update(canonical(str(manager.getFullPath(buffer))) for buffer in manager.getAllBuffers() if manager.getIncludedFrom(buffer))
     if filename not in known_files:
         return []
     qualifier = query.get('qualifier')
@@ -162,7 +257,7 @@ def complete(compilation, defaults, query, manager, point, source_files):
     allowed = {'InstanceBody', 'Package', 'Subroutine', 'StatementBlock', 'GenerateBlock', 'CompilationUnit'}
 
     def in_file(location):
-        return location['file'] and os.path.normcase(os.path.realpath(location['file'])) == filename
+        return location['file'] and canonical(location['file']) == filename
 
     def collect(symbol):
         if not isinstance(symbol, slang.ast.Symbol):
@@ -171,8 +266,10 @@ def complete(compilation, defaults, query, manager, point, source_files):
             names.add(symbol.name)
         if isinstance(symbol, slang.ast.Scope) and symbol.syntax is not None:
             start = point(symbol.syntax.sourceRange.start)
+            if not in_file(start):
+                return  # Names still contribute; this range cannot contain the caret.
             end = point(symbol.syntax.sourceRange.end)
-            if in_file(start) and in_file(end) and start['offset'] <= offset <= end['offset']:
+            if in_file(end) and start['offset'] <= offset <= end['offset']:
                 scopes.append((end['offset'] - start['offset'], symbol))
 
     compilation.getRoot().visit(collect)
@@ -215,39 +312,46 @@ def complete(compilation, defaults, query, manager, point, source_files):
         if following:
             lookup_location = slang.ast.LookupLocation.before(min(following, key=lambda entry: entry[0])[1])
         found = {}
+        # Spellings depend on this exact scope and declaration-order location.
+        # Never reuse them across parameterizations, tests, scopes or requests.
+        enum_values = ScopeEnumValues()
         for name in sorted(names):
             symbol = scope.lookupName((qualifier + '::' if qualifier else '') + name, lookup_location, slang.ast.LookupFlags.NoUndeclaredError)
             if symbol is None or not symbol.location:
                 continue
             entry = describe_symbol(symbol, point)
-            if entry is not None and os.path.normcase(os.path.realpath(entry['location']['file'])) in known_files:
+            if entry is not None and canonical(entry['location']['file']) in known_files:
                 # A typedef/enum import may resolve to another declaration; the
                 # candidate name is the spelling available at the query location.
                 entry['name'] = name
                 t = getattr(symbol, 'type', None)
                 if t is not None and t.canonicalType.isEnum:
-                    values = []
-                    for member in t.canonicalType:
-                        if len(values) >= 256 or not isinstance(member.value.value, slang.SVInt) or member.value.hasUnknown():
-                            values = []
-                            break
-                        spelling = None
-                        visible = scope.lookupName(member.name, lookup_location, slang.ast.LookupFlags.NoUndeclaredError)
-                        if visible is not None and visible.location and point(visible.location) == point(member.location):
-                            spelling = member.name
-                        else:
-                            for package in compilation.getPackages():
-                                if package.name == 'std':
-                                    continue
-                                qualified_name = package.name + '::' + member.name
-                                visible = scope.lookupName(qualified_name, lookup_location, slang.ast.LookupFlags.NoUndeclaredError)
-                                if visible is not None and visible.location and point(visible.location) == point(member.location):
-                                    spelling = qualified_name
-                                    break
-                        if spelling is None:
-                            values = []
-                            break
-                        values.append({'name': spelling, 'value': str(member.value)})
+                    enum_type = t.canonicalType
+                    values = enum_values.get(enum_type)
+                    if values is None:
+                        values = []
+                        for member in enum_type:
+                            if len(values) >= 256 or not isinstance(member.value.value, slang.SVInt) or member.value.hasUnknown():
+                                values = []
+                                break
+                            spelling = None
+                            visible = scope.lookupName(member.name, lookup_location, slang.ast.LookupFlags.NoUndeclaredError)
+                            if visible is not None and visible.location and point(visible.location) == point(member.location):
+                                spelling = member.name
+                            else:
+                                for package in compilation.getPackages():
+                                    if package.name == 'std':
+                                        continue
+                                    qualified_name = package.name + '::' + member.name
+                                    visible = scope.lookupName(qualified_name, lookup_location, slang.ast.LookupFlags.NoUndeclaredError)
+                                    if visible is not None and visible.location and point(visible.location) == point(member.location):
+                                        spelling = qualified_name
+                                        break
+                            if spelling is None:
+                                values = []
+                                break
+                            values.append({'name': spelling, 'value': str(member.value)})
+                        enum_values.put(enum_type, values)
                     if values:
                         entry['enumValues'] = values
                 found[name] = entry
@@ -260,7 +364,7 @@ def complete(compilation, defaults, query, manager, point, source_files):
         definitions = {}
         for definition in compilation.getDefinitions():
             location = point(definition.location)
-            if os.path.normcase(os.path.realpath(location['file'])) in known_files:
+            if canonical(location['file']) in known_files:
                 definitions.setdefault(definition.name, []).append((definition, location))
         visible_names = {entry['name'] for entry in visible}
         for name, entries in sorted(definitions.items()):
@@ -350,13 +454,9 @@ def analyze(request):
     compilation.addSyntaxTree(tree)
     root = compilation.getRoot()
 
-    def point(location):
-        location = manager.getFullyOriginalLoc(location)
-        filename = str(manager.getFullPath(location.buffer))
-        # slang uses UTF-8 bytes; LSP and JavaScript use UTF-16 code units.
-        prefix = manager.getSourceText(location.buffer).encode('utf-8')[:location.offset].decode('utf-8', errors='replace')
-        return {'file': filename, 'offset': len(prefix.encode('utf-16-le')) // 2,
-                'line': prefix.count('\n'), 'character': len(prefix.rsplit('\n', 1)[-1].encode('utf-16-le')) // 2}
+    # slang uses UTF-8 bytes; LSP and JavaScript use UTF-16 code units.
+    positions = SourcePositions(manager)
+    point = positions.point
 
     def ports(instance):
         result = []
@@ -433,15 +533,82 @@ def analyze(request):
     modules = [{'name': instance.definition.name, 'kind': instance.definition.getKindString(),
                 'location': point(instance.definition.location), 'ports': ports(instance), 'parameters': parameters(instance)}
                for instance in defaults.getRoot().topInstances]
-    result = {'modules': modules, 'instances': instances, 'diagnostics': diagnostics}
+    # Unrelated editor overlays are registered buffers too: only compiled sources
+    # and compiler-confirmed includes belong to this analysis. Macro buffers are
+    # synthetic and must never become filesystem watch paths.
+    files = {os.path.abspath(file) for file in request['sources']}
+    files.update(str(manager.getFullPath(buffer)) for buffer in manager.getAllBuffers() if manager.getIncludedFrom(buffer))
+    files.update(os.path.realpath(file) for file in list(files))
+    # IncludeMetadata contains the expanded name (including macro includes).
+    # Missing paths come from compiler diagnostic arguments, never parsed prose.
+    # Other errors retain conservative directory watches too.
+    # Watch all plausible search alternatives so creating a nearer header cannot
+    # leave an old, successfully resolved include in the published analysis.
+    def include_candidates(name, location):
+        directories = {os.getcwd(), *request['includeDirs']}
+        location = manager.getFullyExpandedLoc(location)
+        while location:
+            filename = str(manager.getFullPath(location.buffer))
+            if os.path.isabs(filename):
+                directories.add(os.path.dirname(filename))
+            location = manager.getIncludedFrom(location.buffer)
+        return {os.path.abspath(os.path.join(directory, name)) for directory in directories}
+    candidates = set()
+    for include in tree.getIncludeDirectives():
+        candidates.update(include_candidates(include.path, include.syntax.sourceRange.start))
+    for diagnostic in tree.diagnostics:
+        if str(diagnostic.code) == 'DiagCode(CouldNotOpenIncludeFile)' and diagnostic.args:
+            candidates.update(include_candidates(str(diagnostic.args[0]), diagnostic.location))
+    canonical_files = {os.path.normcase(os.path.realpath(file)) for file in files}
+    files.update(file for file in candidates if os.path.lexists(file) and os.path.normcase(os.path.realpath(file)) in canonical_files)
+    result = {'modules': modules, 'instances': instances, 'diagnostics': diagnostics,
+              'inputs': {'files': sorted(files), 'candidates': sorted(candidates),
+                         'conservative': any(d['severity'] == 'error' for d in diagnostics)}}
     if request.get('query'):
         result['completions'] = complete(compilation, defaults, request['query'], manager, point, request['sources'])
     return result
 
 
+def run_request(request):
+    if request.get('operation') == 'package-session':
+        if request.get('protocol') != 1:
+            raise ValueError('Invalid semantic package protocol')
+        channel = request['packageChannel']
+        # The Core owns graph validation and ordering. Publish data atomically,
+        # then wait for its approval before creating any test compilation.
+        graph = analyze({**request, 'operation': 'dependencies'})
+        with open(channel['graph'] + '.tmp', 'w', encoding='utf-8') as destination:
+            json.dump({'protocol': 1, 'graph': graph}, destination, ensure_ascii=False)
+        os.replace(channel['graph'] + '.tmp', channel['graph'])
+        sys.stdout.write('\x1eRTL_PACKAGE_READY_V1\n')
+        sys.stdout.flush()
+        del graph
+        # Bound an abandoned approval wait even if the owning Node process dies.
+        deadline = time.monotonic() + 15
+        while not os.path.exists(channel['continue']):
+            if time.monotonic() >= deadline:
+                raise TimeoutError('Semantic package approval did not arrive')
+            time.sleep(0.01)
+        with open(channel['continue'], encoding='utf-8') as source:
+            continuation = json.load(source)
+        if continuation.get('protocol') != 1 or not isinstance(continuation.get('approval'), str) or continuation['request'].get('operation') not in (
+                None, 'batch', 'hierarchy', 'internalOperations', 'scopeOperations'):
+            raise ValueError('Invalid semantic package continuation')
+        common = {key: value for key, value in request.items()
+                  if key not in ('operation', 'sources', 'protocol', 'packageChannel')}
+        return {'protocol': 1, 'approval': continuation['approval'],
+                'result': run_request({**common, **continuation['request']})}
+    if request.get('operation') == 'batch':
+        # Fresh managers, syntax trees and compilations isolate same-named tops,
+        # macros and includes. Only Python/module startup is shared, for this call.
+        return {'analyses': [analyze({**request, **group, 'operation': None})
+                             for group in request['groups']]}
+    return analyze(request)
+
+
 if __name__ == '__main__':
     with open(sys.argv[1], encoding='utf-8') as source:
         request = json.load(source)
-    result = analyze(request)
+    result = run_request(request)
     with open(sys.argv[2], 'w', encoding='utf-8') as destination:
         json.dump(result, destination, ensure_ascii=False)
