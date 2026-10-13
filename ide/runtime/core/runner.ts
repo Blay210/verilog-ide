@@ -7,6 +7,7 @@ import { prepareProject } from './project';
 import { captureInputs } from './identity';
 import { captureTraceIdentity } from './trace';
 import { createInputSnapshot, loadRecordedInputs, SnapshotPreparationError } from './snapshot';
+import { ProcessFailure } from './process';
 export interface RunContext extends OperationContext { inputOverrides?: readonly InputOverride[]; packageProvider?: PackageDependencyProvider; jobs?: number; onStart?: (target: TestTarget) => void; onTestLog?: (target: TestTarget, text: string) => void; onResult?: (result: TestResult) => void }
 
 export async function runTest(project: Project, target: TestTarget, backend: SimulatorBackend, context: RunContext = {}): Promise<TestResult> {
@@ -39,6 +40,8 @@ export async function runTest(project: Project, target: TestTarget, backend: Sim
     if (!controller.signal.aborted) { timedOut = true; controller.abort(); }
   }, target.timeoutMs);
   const result: TestResult = { name: target.name, top: target.top, status: 'passed', durationMs: 0, directory, log: logPath, source: target.sources[0], startedAt: new Date(start).toISOString(), tags: target.tags ?? [], sources: [...new Set([...project.sources, ...target.sources])] };
+  const finalizationError = (error: unknown) => result.cleanupFailure
+    ? new ProcessFailure(`${result.cleanupFailure} Result finalization failed: ${String(error)}`, false, true) : error;
   try {
     controller.signal.throwIfAborted();
     if (inputOverrides.length && !backend.capabilities.inputSnapshot) throw new SnapshotPreparationError('Backend cannot execute editor input snapshots.');
@@ -74,13 +77,14 @@ export async function runTest(project: Project, target: TestTarget, backend: Sim
     await backend.run(artifact, { signal: controller.signal, onLog: writeLog });
     controller.signal.throwIfAborted();
   } catch (error) {
-    result.status = timedOut ? 'timedOut' : controller.signal.aborted ? 'cancelled' : 'failed';
-    result.message = timedOut ? `Exceeded ${target.timeoutMs} ms (build + simulation).` : String(error);
+    if (error instanceof ProcessFailure && error.cleanupFailed) result.cleanupFailure = error.message;
+    result.status = result.cleanupFailure ? 'failed' : timedOut ? 'timedOut' : controller.signal.aborted ? 'cancelled' : 'failed';
+    result.message = result.cleanupFailure ?? (timedOut ? `Exceeded ${target.timeoutMs} ms (build + simulation).` : String(error));
     writeLog(`${result.message}\n`);
   } finally {
     clearTimeout(timer); context.signal?.removeEventListener('abort', abort);
     result.durationMs = Date.now() - start;
-    await writes.finally(() => log.close());
+    try { await writes.finally(() => log.close()); } catch (error) { throw finalizationError(error); }
   }
   result.runId = runId;
   if (result.inputSnapshot?.state === 'ready') {
@@ -104,8 +108,10 @@ export async function runTest(project: Project, target: TestTarget, backend: Sim
     if (!result.waveform && result.status === 'passed') result.message = [result.message, backend.capabilities.managedWaveform ? 'IDE waveform recording produced no trace. Check the execution log; no RTL dump code is required.' : 'No waveform generated. Add $dumpfile/$dumpvars to the testbench (see the example).'].filter(Boolean).join('\n');
   }
   if (result.waveform && project.waveform !== 'none') result.traceIdentity = await captureTraceIdentity(result, project.waveform, context.signal);
-  await writeFile(path.join(directory, 'result.json.partial'), JSON.stringify(result, null, 2));
-  await rename(path.join(directory, 'result.json.partial'), path.join(directory, 'result.json'));
+  try {
+    await writeFile(path.join(directory, 'result.json.partial'), JSON.stringify(result, null, 2));
+    await rename(path.join(directory, 'result.json.partial'), path.join(directory, 'result.json'));
+  } catch (error) { throw finalizationError(error); }
   return result;
 }
 
@@ -124,6 +130,7 @@ export async function runTests(project: Project, targets: TestTarget[], backend:
         const index = next++, target = targets[index]; context.onStart?.(target);
         const result = await runTest(project, target, backend, { ...context, signal, onLog: text => { context.onLog?.(text); context.onTestLog?.(target, text); } });
         results[index] = result; context.onResult?.(result);
+        if (result.cleanupFailure) abort.abort();
       }
     } catch (error) { abort.abort(); throw error; }
   });

@@ -9,7 +9,7 @@ import { FileAccess, type AppResourcePath } from '../../../../base/common/networ
 import { URI } from '../../../../base/common/uri.js';
 import { extUriBiasedIgnorePathCase } from '../../../../base/common/resources.js';
 import { IFileService, FileSystemProviderCapabilities, FileType, FilePermission, type IFileSystemProviderWithFileReadWriteCapability } from '../../../../platform/files/common/files.js';
-import type { RecordedSource, RecordedSourceText, RunComparison } from '../../../../platform/rtl/common/rtlSimulation.js';
+import type { RecordedSource, RecordedSourceText, RunComparison, TestListEdit } from '../../../../platform/rtl/common/rtlSimulation.js';
 import { IWorkingCopyService } from '../../../services/workingCopy/common/workingCopyService.js';
 import { ITextFileService } from '../../../services/textfile/common/textfiles.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
@@ -23,6 +23,8 @@ import type { SimulationState, SimulationTestView, WaveformDocument, WaveformQue
 import { parseView, retainMissing } from '../../../../platform/rtl/common/waveform/views.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { ILifecycleService } from '../../../services/lifecycle/common/lifecycle.js';
+import { RecordedSourceCache } from '../../../../platform/rtl/common/recordedSourceCache.js';
+import type { ImportRecoveryChoice } from '../../../../platform/rtl/common/rtlSimulation.js';
 
 export class RtlSimulationHome extends Disposable {
   private readonly explorerChanged = this._register(new Emitter<void>({ leakWarningThreshold: 1024, leakWarningName: 'RTL Explorer row templates' })); // Virtualized rows each own and dispose one listener; zero rejects listeners upstream.
@@ -30,14 +32,18 @@ export class RtlSimulationHome extends Disposable {
   private explorerSignature = '';
   private state: SimulationState = { revision: -1, tests: [], phase: 'idle', log: '' };
   private readonly channel;
-  private readonly recordedTexts = new Map<string, Uint8Array>();
+  private readonly recordedTexts = new RecordedSourceCache();
+  private recordedEpoch = 0;
   private readonly status = mainWindow.document.createElement('p');
   private readonly notice = mainWindow.document.createElement('p');
   private readonly sourceNotice = mainWindow.document.createElement('p');
   private readonly rows = mainWindow.document.createElement('div');
+  private readonly testCount = mainWindow.document.createElement('span');
+  private readonly testScope = mainWindow.document.createElement('p');
+  private readonly emptyTests = mainWindow.document.createElement('p');
   private readonly log = mainWindow.document.createElement('pre');
   private readonly selected = new Set<string>();
-  private readonly rowElements = new Map<string, { result: HTMLElement; warning: HTMLElement; history: HTMLSelectElement; historySignature?: string; run: HTMLButtonElement; log: HTMLButtonElement; wave: HTMLButtonElement; source: HTMLButtonElement; compare: HTMLButtonElement; diff: HTMLButtonElement }>();
+  private readonly rowElements = new Map<string, { element: HTMLDivElement; identity: string; result: HTMLElement; warning: HTMLElement; history: HTMLSelectElement; historySignature?: string; run: HTMLButtonElement; log: HTMLButtonElement; wave: HTMLButtonElement; source: HTMLButtonElement; compare: HTMLButtonElement; diff: HTMLButtonElement; remove: HTMLButtonElement }>();
   private readonly chosenRuns = new Map<string, string>();
   private comparisonTimer: number | undefined;
   private comparisonPending = false;
@@ -57,6 +63,9 @@ export class RtlSimulationHome extends Disposable {
   private readonly reload: HTMLButtonElement;
   private readonly setup: HTMLButtonElement;
   private readonly manage: HTMLButtonElement;
+  private readonly addFolder: HTMLButtonElement;
+  private readonly addFile: HTMLButtonElement;
+  private readonly restoreTest: HTMLButtonElement;
   private managedRevision: string | undefined;
   private signature = '';
   private loading = false;
@@ -73,7 +82,7 @@ export class RtlSimulationHome extends Disposable {
   constructor(private readonly container: HTMLElement,
     shared: ISharedProcessService, private readonly workspace: IWorkspaceContextService,
     private readonly trust: IWorkspaceTrustManagementService, private readonly commands: ICommandService,
-    private readonly editors: IEditorService, lifecycle: ILifecycleService, dialogs: IDialogService, private readonly quickInput: IQuickInputService,
+    private readonly editors: IEditorService, lifecycle: ILifecycleService, private readonly dialogs: IDialogService, private readonly quickInput: IQuickInputService,
     private readonly files: IFileService, private readonly workingCopies: IWorkingCopyService, private readonly configuration: IConfigurationService, private readonly textFiles: ITextFileService) {
     super(); this.channel = shared.getChannel('rtlSimulation');
     const denied = async (): Promise<never> => { throw Error('실행 보관 소스는 읽기 전용입니다. 현재 소스에서 편집해 주세요.'); };
@@ -85,8 +94,17 @@ export class RtlSimulationHome extends Disposable {
       writeFile: denied, mkdir: denied, delete: denied, rename: denied, readdir: denied
     };
     this._register(this.files.registerProvider('rtl-run-source', provider));
+    this._register(this.files.registerProvider('rtl-import-recovery', { ...provider,
+      stat: async resource => ({ type: FileType.File, permissions: FilePermission.Readonly, ctime: 0, mtime: 0, size: (await this.recoveryBytes(resource)).length }),
+      readFile: async resource => (await this.recoveryBytes(resource)).slice()
+    }));
+    this._register(this.textFiles.files.onDidRemove(resource => {
+      if (['rtl-run-source', 'rtl-import-recovery'].includes(resource.scheme)) this.recordedTexts.release(resource.toString());
+    }));
     const title = mainWindow.document.createElement('h1'); title.textContent = 'Simulation';
     const description = mainWindow.document.createElement('p'); description.textContent = '테스트를 실행하고 결과와 로그를 확인하세요.';
+    const header = mainWindow.document.createElement('header'); header.className = 'rtl-simulation-header';
+    const heading = mainWindow.document.createElement('div'); heading.append(title, description);
     const toolbar = mainWindow.document.createElement('div'); toolbar.className = 'rtl-simulation-toolbar';
     this.all = this.button('전체 실행', () => this.start(), 'run-all');
     this.selection = this.button('선택 실행', () => this.start([...this.selected]), 'run-selected');
@@ -94,8 +112,14 @@ export class RtlSimulationHome extends Disposable {
     this.reload = this.button('새로고침', () => this.refresh(), 'refresh');
     this.setup = this.button('도구 설정', async () => { await this.commands.executeCommand('rtl.setupTools'); await this.refresh(); }, 'setup-tools');
     this.manage = this.button('테스트 관리', () => this.manageProject(), 'manage-tests');
-    toolbar.append(this.all, this.selection, this.stop, this.reload, this.manage, this.setup);
+    const execution = this.group('실행', 'rtl-simulation-run-actions'); execution.append(this.all, this.selection, this.stop);
+    const projectActions = this.group('프로젝트 관리', 'rtl-simulation-project-actions'); projectActions.append(this.reload, this.manage, this.setup);
+    toolbar.append(execution, projectActions);
     const open = this.button('폴더 열기', () => this.commands.executeCommand('workbench.action.files.openFolder'), 'open-folder');
+    header.append(heading, open);
+    const controls = mainWindow.document.createElement('section'); controls.className = 'rtl-simulation-card rtl-simulation-controls';
+    controls.setAttribute('aria-label', '프로젝트와 실행');
+    this.status.className = 'rtl-simulation-project-status';
     this.status.setAttribute('role', 'status'); this.status.setAttribute('aria-live', 'polite');
     this.notice.className = 'rtl-simulation-notice';
     this.sourceNotice.className = 'rtl-simulation-notice';
@@ -103,12 +127,26 @@ export class RtlSimulationHome extends Disposable {
     this.sourceNotice.setAttribute('role', 'status');
     this.sourceNotice.setAttribute('aria-live', 'polite');
     this.rows.className = 'rtl-simulation-tests';
-    const details = mainWindow.document.createElement('details'); details.className = 'rtl-simulation-log';
+    const tests = mainWindow.document.createElement('section'); tests.className = 'rtl-simulation-card rtl-simulation-test-section';
+    tests.setAttribute('aria-label', '테스트 목록');
+    const testsHeader = mainWindow.document.createElement('div'); testsHeader.className = 'rtl-simulation-section-heading';
+    const testsTitle = mainWindow.document.createElement('h2'); testsTitle.textContent = '테스트';
+    this.testCount.className = 'rtl-simulation-count'; testsHeader.append(testsTitle, this.testCount);
+    const registrations = this.group('TB 등록과 제외 복원', 'rtl-simulation-registration-actions');
+    this.addFolder = this.button('TB 폴더 등록', () => this.registerTestPath('folder'), 'add-tb-folder');
+    this.addFile = this.button('TB 파일 추가', () => this.registerTestPath('file'), 'add-tb-file');
+    this.restoreTest = this.button('제외한 TB 복원', () => this.restoreExcludedTest(), 'restore-tb');
+    registrations.append(this.addFolder, this.addFile, this.restoreTest); testsHeader.append(registrations);
+    this.emptyTests.className = 'rtl-simulation-empty'; this.emptyTests.textContent = '등록된 테스트가 없습니다. 프로젝트를 열거나 테스트 관리에서 실행할 테스트를 확인하세요.';
+    this.testScope.className = 'rtl-simulation-scope';
+    tests.append(testsHeader, this.testScope, this.emptyTests, this.rows);
+    const details = mainWindow.document.createElement('details'); details.className = 'rtl-simulation-card rtl-simulation-log';
     const summary = mainWindow.document.createElement('summary'); summary.textContent = '실행 로그';
     this.log.tabIndex = 0; this.log.setAttribute('aria-label', 'Simulation log');
     details.open = true; details.append(summary, this.log);
     const importTitle = mainWindow.document.createElement('h2'); importTitle.textContent = '프로젝트 가져오기';
     const importNote = mainWindow.document.createElement('p'); importNote.textContent = '찾은 파일과 역할을 확인한 뒤 분류 저장을 누르면 rtl.toml에 기록합니다. 원본 코드는 수정하지 않습니다. 실행 후보는 의미 분석 확인이 필요합니다.';
+    this.importArea.className = 'rtl-simulation-card rtl-simulation-import';
     this.importArea.setAttribute('aria-label', '프로젝트 가져오기'); this.importArea.hidden = true;
     this.importSearch.type = 'search'; this.importSearch.placeholder = '파일 검색'; this.importSearch.setAttribute('aria-label', '가져오기 파일 검색');
     this.importSearch.addEventListener('input', () => { this.reviewSignature = ''; this.paintReview(); });
@@ -117,7 +155,9 @@ export class RtlSimulationHome extends Disposable {
     const advanced = mainWindow.document.createElement('details'), advancedTitle = mainWindow.document.createElement('summary');
     advancedTitle.textContent = '추가 분석 설정'; advanced.append(advancedTitle, this.importIncludes);
     this.importArea.append(importTitle, importNote, this.importSearch, advanced, this.importContent);
-    this.page.append(title, description, toolbar, this.status, this.notice, this.sourceNotice, open, this.importArea, this.rows, details);
+    controls.append(this.status, toolbar, this.notice, this.sourceNotice);
+    this.page.className = 'rtl-simulation-page';
+    this.page.append(header, controls, this.importArea, tests, details);
     this.tabs.className = 'rtl-wave-tabs'; this.tabs.hidden = true;
     this.waveArea.className = 'rtl-wave-area'; this.waveArea.hidden = true;
     this.tabs.append(this.button('Simulation 홈', () => this.showWave(), 'simulation-home'));
@@ -130,7 +170,7 @@ export class RtlSimulationHome extends Disposable {
     this._register(this.trust.onDidChangeTrust(() => this.paint()));
     this._register(files.onDidFilesChange(event => {
       if (this.state.root && [...event.rawAdded, ...event.rawUpdated, ...event.rawDeleted].some(resource => extUriBiasedIgnorePathCase.isEqualOrParent(resource, URI.file(this.state.root!))
-        && !/[\\/](?:\.rtl|\.git|node_modules)([\\/]|$)/.test(resource.fsPath))) { this.inputEpoch++; this.scheduleComparison(); this.paint(); }
+        && (!/[\\/](?:\.rtl|\.git|node_modules)([\\/]|$)/.test(resource.fsPath) || /[\\/]\.rtl[\\/]import-transactions[\\/].+[\\/]previous\.toml$/.test(resource.fsPath)))) { this.inputEpoch++; this.scheduleComparison(); this.paint(); }
     }));
     this._register(this.workingCopies.onDidChangeDirty(copy => { if (this.isInput(copy.resource)) { this.inputEpoch++; this.scheduleComparison(); this.paint(); } }));
     this._register(this.workingCopies.onDidChangeContent(copy => { if (copy.isDirty() && this.isInput(copy.resource)) { this.inputEpoch++; this.scheduleComparison(); this.paint(); } }));
@@ -150,12 +190,48 @@ export class RtlSimulationHome extends Disposable {
     button.addEventListener('click', () => { void Promise.resolve().then(action).catch(error => this.fail(error)); });
     return button;
   }
+  private group(label: string, className: string): HTMLDivElement {
+    const group = mainWindow.document.createElement('div'); group.className = className;
+    group.setAttribute('role', 'group'); group.setAttribute('aria-label', label);
+    return group;
+  }
+  private iconButton(label: string, action: () => Promise<unknown> | unknown, id: string, icon: 'play' | 'terminal' | 'waveform'): HTMLButtonElement {
+    const button = this.button(label, action, id);
+    button.title = icon === 'play' ? '실행' : icon === 'terminal' ? '로그' : '파형'; button.setAttribute('aria-label', label);
+    const symbol = mainWindow.document.createElement('span'); symbol.className = `rtl-simulation-icon rtl-icon-${icon}`;
+    symbol.setAttribute('aria-hidden', 'true'); button.replaceChildren(symbol);
+    return button;
+  }
+  private async editTestList(edit: TestListEdit, root: string, revision: string, epoch: number): Promise<void> {
+    if (this.stopped || this.recordedEpoch !== epoch || this.state.root !== root || this.busy || this.loading || this.state.phase === 'loading' || this.dirtyManifest || !this.trust.isWorkspaceTrusted() || this.state.testList?.revision !== revision) throw Error('프로젝트나 TB 목록이 바뀌었습니다. 새로고침한 뒤 다시 선택해 주세요.');
+    await this.call('test-list-edit', { testEdit: edit, revision, approved: true });
+  }
+  private async registerTestPath(action: 'folder' | 'file'): Promise<void> {
+    const root = this.state.root, revision = this.state.testList?.revision, epoch = this.recordedEpoch;
+    if (!root || !revision) throw Error('프로젝트를 먼저 열어 주세요.');
+    const value = await this.quickInput.input({ prompt: action === 'folder' ? '자동으로 TB를 찾을 폴더의 프로젝트 상대 경로' : '등록할 TB 코드 파일의 프로젝트 상대 경로', placeHolder: action === 'folder' ? 'verification/tb' : 'verification/counter_tb.sv' });
+    if (value === undefined || !value.trim()) return;
+    await this.editTestList({ action, path: value.trim() }, root, revision, epoch);
+  }
+  private async restoreExcludedTest(): Promise<void> {
+    const root = this.state.root, revision = this.state.testList?.revision, epoch = this.recordedEpoch;
+    if (!root || !revision) return;
+    const chosen = await this.quickInput.pick((this.state.testList?.excluded ?? []).map(item => ({ label: item.top, description: item.file, item })), { placeHolder: '목록에서 제외했던 TB를 다시 등록' });
+    if (chosen) await this.editTestList({ action: 'restore', ...chosen.item }, root, revision, epoch);
+  }
+  private async removeTest(test: SimulationTestView, root: string | undefined, epoch: number): Promise<void> {
+    const revision = this.state.testList?.revision;
+    if (!root || !revision || !test.source) return;
+    const file = test.source.slice(root.length + 1).replaceAll('\\', '/');
+    if (!extUriBiasedIgnorePathCase.isEqualOrParent(URI.file(test.source), URI.file(root))) throw Error('프로젝트 밖의 TB는 목록에서 관리할 수 없습니다.');
+    await this.editTestList({ action: 'exclude', file, top: test.top, name: test.name }, root, revision, epoch);
+  }
   get busy(): boolean { return this.state.phase === 'running' || this.state.phase === 'cancelling'; }
   private get dirtyManifest(): boolean {
     const root = this.state.root;
     if (!root) { return false; }
-    const target = URI.joinPath(URI.file(root), 'rtl.toml');
-    return this.workingCopies.dirtyWorkingCopies.some(copy => copy.resource.scheme === 'file' && extUriBiasedIgnorePathCase.isEqualOrParent(copy.resource, target));
+    const targets = ['rtl.toml', 'rtl-tests.json'].map(file => URI.joinPath(URI.file(root), file));
+    return this.workingCopies.dirtyWorkingCopies.some(copy => copy.resource.scheme === 'file' && targets.some(target => extUriBiasedIgnorePathCase.isEqualOrParent(copy.resource, target)));
   }
   get diagnostic() { return { ...this.state, sourceNotice: { visible: !this.sourceNotice.hidden && !this.page.hidden, text: this.sourceNotice.textContent, details: this.sourceNotice.title, manageLabel: this.manage.textContent }, dirtyManifest: this.dirtyManifest, reviewVisible: !this.importArea.hidden, reviewFileRows: this.importContent.querySelectorAll('[data-role-kind=file]').length, reviewSelectedTops: [...this.importTops], selected: [...this.selected], trusted: this.trust.isWorkspaceTrusted(), controls: { allEnabled: !this.all.disabled, cancelEnabled: !this.stop.disabled, setupEnabled: !this.setup.disabled }, rowCount: this.rowElements.size,
     results: [...this.rowElements].map(([name, row]) => ({ name, warning: row.warning.textContent, runId: row.history.value, historyCount: row.history.options.length })),
@@ -166,7 +242,7 @@ export class RtlSimulationHome extends Disposable {
     for (const [id, item] of this.documents) { item.frame.hidden = id !== runId; item.tab.setAttribute('aria-current', String(id === runId)); }
   }
   private isInput(resource: URI): boolean {
-    return !!this.state.root && resource.scheme === 'file' && extUriBiasedIgnorePathCase.isEqualOrParent(resource, URI.file(this.state.root)) && /\.(v|sv|vh|svh)$|[\\/]rtl\.toml$/i.test(resource.fsPath) && !/[\\/](?:\.rtl|\.git|node_modules)([\\/]|$)/i.test(resource.fsPath);
+    return !!this.state.root && resource.scheme === 'file' && extUriBiasedIgnorePathCase.isEqualOrParent(resource, URI.file(this.state.root)) && /\.(v|sv|vh|svh)$|[\\/](?:rtl\.toml|rtl-tests\.json)$/i.test(resource.fsPath) && !/[\\/](?:\.rtl|\.git|node_modules)([\\/]|$)/i.test(resource.fsPath);
   }
   private scheduleComparison(): void {
     this.comparisonPending = true;
@@ -294,7 +370,7 @@ export class RtlSimulationHome extends Disposable {
   async start(names?: string[]): Promise<void> {
     if (!this.trust.isWorkspaceTrusted()) { this.fail('신뢰하지 않는 프로젝트에서는 실행할 수 없습니다. 코드 편집은 계속할 수 있습니다.'); return; }
     if (this.busy || this.loading) { return; }
-    if (this.dirtyManifest) throw Error('rtl.toml에 미저장 변경이 있습니다. 먼저 변경을 검토해 주세요.');
+    if (this.dirtyManifest) throw Error('프로젝트 설정에 미저장 변경이 있습니다. 먼저 변경을 검토해 주세요.');
     if (!this.state.root) throw Error('프로젝트를 먼저 열어 주세요.');
     const inputOverrides = this.captureEditorInputs();
     this.displayedLog = undefined;
@@ -321,7 +397,7 @@ export class RtlSimulationHome extends Disposable {
   }
   async cancel(): Promise<void> { await this.call('cancel'); }
   fileTargets(resource: URI): SimulationTestView[] { return resource.scheme === 'file' && !this.stopped ? testsForFile(this.state, resource.fsPath, isWindows) : []; }
-  get explorerEnabled(): boolean { return !this.stopped && this.trust.isWorkspaceTrusted() && !this.busy && !this.loading && this.state.phase !== 'loading' && !this.state.review && !this.dirtyManifest; }
+  get explorerEnabled(): boolean { return !this.stopped && !!this.state.project && !this.state.historyOnly && !this.state.importRecovery?.length && this.trust.isWorkspaceTrusted() && !this.busy && !this.loading && this.state.phase !== 'loading' && !this.state.review && !this.dirtyManifest; }
   async startFile(resource: URI): Promise<boolean> {
     if (!this.state.root && !this.loading) await this.refresh();
     if (!this.explorerEnabled) throw Error('현재는 실행할 수 없습니다. 프로젝트 신뢰, 실행 상태와 미저장 rtl.toml을 확인해 주세요.');
@@ -367,24 +443,73 @@ export class RtlSimulationHome extends Disposable {
     const root = this.state.root;
     if (!root || !this.state.review) { throw Error('먼저 프로젝트 가져오기를 검토해 주세요.'); }
     if (this.dirtyManifest) {
-      throw Error('rtl.toml에 미저장 변경이 있습니다. 먼저 저장하거나 변경을 검토해 주세요.');
+      throw Error('프로젝트 설정에 미저장 변경이 있습니다. 먼저 저장하거나 변경을 검토해 주세요.');
     }
     await this.call('review-save', { approved: true });
   }
   async manageProject(): Promise<void> {
-    if (this.dirtyManifest) throw Error('rtl.toml에 미저장 변경이 있습니다. 먼저 변경을 검토해 주세요.');
+    if (this.state.importRecovery?.length) { await this.recoverSettings(); return; }
+    if (this.dirtyManifest) throw Error('프로젝트 설정에 미저장 변경이 있습니다. 먼저 변경을 검토해 주세요.');
+    if (this.state.importJournal?.archive && this.state.importJournal.count >= 64) {
+      const root = this.state.root, epoch = this.recordedEpoch, plan = this.state.importJournal.archive;
+      const selected = await this.quickInput.pick([{ label: '테스트 관리', action: 'manage' }, { label: '이전 설정 기록 별도 보관', action: 'archive' }], { placeHolder: `설정 기록 ${this.state.importJournal.count}개 · 별도 보관하면 파일을 유지하며 조회 부담을 줄입니다` });
+      if (!selected) return;
+      if (this.stopped || root !== this.state.root || epoch !== this.recordedEpoch || this.busy || this.loading || this.state.phase === 'loading' || this.dirtyManifest || !this.trust.isWorkspaceTrusted() || this.state.importJournal?.archive?.revision !== plan.revision) throw Error('보관할 기록이나 프로젝트가 바뀌었습니다. 다시 확인해 주세요.');
+      if (selected.action === 'archive') { await this.archiveSettings(); return; }
+    }
     this.showWave();
     await this.call('manage', { approved: this.trust.isWorkspaceTrusted() });
   }
+  private async archiveSettings(): Promise<void> {
+    const root = this.state.root, epoch = this.recordedEpoch, plan = this.state.importJournal?.archive;
+    if (!root || !plan) return;
+    const check = () => { if (this.stopped || root !== this.state.root || epoch !== this.recordedEpoch || this.busy || this.loading || this.state.phase === 'loading' || this.dirtyManifest || !this.trust.isWorkspaceTrusted() || this.state.importJournal?.archive?.revision !== plan.revision) throw Error('보관할 기록이나 프로젝트가 바뀌었습니다. 다시 확인해 주세요.'); };
+    check();
+    const answer = await this.dialogs.confirm({ message: `이전 설정 기록 ${plan.count}개를 별도 보관할까요?`, detail: `현재 설정은 유지하고 파일을 삭제하지 않습니다. 약 ${Math.ceil(plan.bytes / 1024)} KiB를 별도 보관하며 ${plan.retained}개 기록은 계속 확인합니다. 보관한 기록은 자동 변경 검사에서 제외됩니다. 이전 설정을 열어 둔 다른 프로그램은 먼저 닫아 주세요.`, primaryButton: '별도 보관' });
+    if (!answer.confirmed) return;
+    check(); await this.call('import-archive', { archive: plan, approved: true });
+  }
+  private async recoveryBytes(resource: URI): Promise<Uint8Array> {
+    const { root, request, choice } = JSON.parse(resource.query);
+    const epoch = this.recordedEpoch;
+    if (this.stopped || root !== this.state.root || !request || !['current', 'previous', 'candidate'].includes(choice)) throw Error('복구할 프로젝트나 설정 후보가 바뀌었습니다.');
+    return this.recordedTexts.read(resource.toString(), async () => {
+      const text = await this.channel.call<string>('import-recovery-text', { recovery: request, choice });
+      if (this.stopped || root !== this.state.root || epoch !== this.recordedEpoch) throw Error('복구할 프로젝트가 바뀌었습니다.');
+      return new TextEncoder().encode(text);
+    });
+  }
+  private async recoverSettings(): Promise<void> {
+    if (!this.trust.isWorkspaceTrusted() || this.dirtyManifest || this.busy || this.loading || this.state.phase === 'loading') throw Error('프로젝트 신뢰와 미저장 rtl.toml을 먼저 확인해 주세요.');
+    const root = this.state.root, epoch = this.recordedEpoch, request = this.state.importRecovery?.[0];
+    if (!root || !request) return;
+    const labels: Record<ImportRecoveryChoice, string> = { current: '현재 rtl.toml 유지', previous: '이전 설정 복원', candidate: '요청한 설정 적용' };
+    const choices = (['current', 'previous', 'candidate'] as const).filter(choice => request[choice]).map(choice => ({ label: labels[choice], choice }));
+    const selected = await this.quickInput.pick(choices, { placeHolder: '복구할 설정을 선택하면 읽기 전용으로 내용을 확인할 수 있습니다' });
+    if (!selected) return;
+    const check = () => { if (this.stopped || root !== this.state.root || epoch !== this.recordedEpoch || this.busy || this.loading || this.state.phase === 'loading' || this.dirtyManifest || !this.trust.isWorkspaceTrusted() || this.state.importRecovery?.[0]?.revision !== request.revision) throw Error('복구할 설정이나 프로젝트가 바뀌었습니다. 다시 확인해 주세요.'); };
+    check();
+    const resource = (choice: ImportRecoveryChoice) => URI.from({ scheme: 'rtl-import-recovery', path: `/${request.id}/${choice}.toml`, query: JSON.stringify({ root, request, choice }) });
+    const selectedResource = resource(selected.choice); await this.recoveryBytes(selectedResource); check();
+    if (request.current && selected.choice !== 'current') {
+      const current = resource('current'); await this.recoveryBytes(current); check();
+      await this.editors.openEditor({ original: { resource: current, label: '현재 설정' }, modified: { resource: selectedResource, label: labels[selected.choice] }, label: '설정 복구 · 읽기 전용 비교', options: { pinned: true } });
+    } else await this.editors.openEditor({ resource: selectedResource, label: labels[selected.choice], description: '설정 복구 · 읽기 전용', options: { pinned: true } });
+    check();
+    const answer = await this.dialogs.confirm({ message: `${labels[selected.choice]}로 복구할까요?`, detail: '열린 읽기 전용 내용을 확인해 주세요. 다른 후보는 보관되며, 확인 뒤 설정이 바뀌면 복구를 중단합니다.', primaryButton: '복구' });
+    if (!answer.confirmed) return;
+    check(); await this.call('import-recover', { recovery: request, choice: selected.choice, approved: true });
+  }
   async prepareReview(selection?: ImportSelection, register = false): Promise<void> {
     if (!this.trust.isWorkspaceTrusted()) { throw Error('신뢰하지 않는 프로젝트에서는 의미 분석을 실행할 수 없습니다.'); }
-    if (this.dirtyManifest) { throw Error('rtl.toml에 미저장 변경이 있습니다. 먼저 검토해 주세요.'); }
+    if (this.dirtyManifest) { throw Error('프로젝트 설정에 미저장 변경이 있습니다. 먼저 검토해 주세요.'); }
     await this.call(register ? 'review-confirm' : 'review-prepare', { selection: selection ?? { ids: [...this.importTops], includeDirs: this.importIncludes.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean), defines: this.state.review?.execution?.defines }, approved: this.trust.isWorkspaceTrusted(), toolsDirectory: this.configuration.getValue<string>('rtl.toolsDirectory') });
   }
   private fail(error: unknown): void { this.status.textContent = String(error); }
   private accept(state: SimulationState): void {
     if (this.stopped || state.revision < this.state.revision) { return; }
     const wasBusy = this.busy;
+    if (this.state.root !== state.root) { this.recordedEpoch++; this.recordedTexts.clear(); }
     this.state = state;
     if ((wasBusy && !this.busy) || (this.comparisonPending && !this.busy && !this.loading && state.phase !== 'loading' && !state.review)) { this.scheduleComparison(); }
     // Compiler output can arrive in many small chunks. Keep keyboard focus and
@@ -398,27 +523,49 @@ export class RtlSimulationHome extends Disposable {
     const explorerSignature = JSON.stringify([this.state.root, this.state.project, this.state.tests.map(test => [test.name, test.top, test.source]), this.explorerEnabled, this.state.review, this.state.savedFolderRoles]);
     if (explorerSignature !== this.explorerSignature) { this.explorerSignature = explorerSignature; this.explorerChanged.fire(); }
     const trusted = this.trust.isWorkspaceTrusted();
-    const disabled = this.busy || this.loading || this.state.phase === 'loading' || !!this.state.review || !this.state.tests.length || !trusted;
+    const disabled = this.busy || this.loading || this.state.phase === 'loading' || !!this.state.review || !!this.state.historyOnly || !!this.state.importRecovery?.length || !this.state.project || !this.state.tests.length || !trusted;
     this.manage.disabled = this.busy || this.loading || this.state.phase === 'loading' || !this.state.root || !trusted;
+    const listLocked = this.busy || this.loading || this.state.phase === 'loading' || !this.state.testList || !!this.state.review || !!this.state.importRecovery?.length || this.dirtyManifest || !trusted;
+    this.addFolder.disabled = listLocked; this.addFile.disabled = listLocked;
+    this.restoreTest.disabled = listLocked || !this.state.testList?.excluded.length;
     this.all.disabled = disabled; this.selection.disabled = disabled || !this.selected.size;
     this.setup.disabled = this.busy || this.loading;
     this.stop.disabled = (!this.busy && !(this.state.phase === 'loading' && this.state.root)) || this.state.phase === 'cancelling'; this.reload.disabled = this.busy || this.loading || this.state.phase === 'loading';
     this.status.textContent = this.state.error ?? (this.busy ? `${this.state.phase === 'cancelling' ? '취소 중' : '실행 중'}${this.state.activeTest ? ': ' + this.state.activeTest : ''}`
       : this.loading || this.state.phase === 'loading' ? '프로젝트를 읽는 중…' : this.state.review ? `설정 전 · 파일 ${this.state.review.inventory.sources.length}개 · 실행 후보 ${this.state.review.inventory.tops.length}개` : this.state.project ? `${this.state.project} · 테스트 ${this.state.tests.length}개` : '프로젝트를 열어 주세요.');
-    this.notice.textContent = trusted ? '실행 시점의 RTL 편집 내용을 보존합니다. 보관 소스에서 실제 사용한 코드를 읽기 전용으로 확인하세요.' : '신뢰하지 않는 프로젝트입니다. 실행은 잠겨 있고 코드 편집은 가능합니다.';
+    this.status.dataset.phase = this.state.error ? 'error' : this.busy ? this.state.phase : this.loading ? 'loading' : this.state.phase;
+    const count = `${this.state.tests.length}개`;
+    if (this.testCount.textContent !== count) { this.testCount.textContent = count; }
+    this.emptyTests.hidden = this.state.tests.length > 0;
+    const folders = this.state.testList?.folders ?? [];
+    this.testScope.hidden = !folders.length;
+    const scope = `자동 감지 폴더 · ${folders.map(folder => folder || '프로젝트 전체').join(' · ')}`;
+    if (this.testScope.textContent !== scope) { this.testScope.textContent = scope; }
+    this.notice.textContent = this.state.historyOnly ? '보관 이력을 표시합니다. 현재 설정과 소스를 복구한 뒤 새로고침하면 실행할 수 있습니다.' : trusted ? '실행 시점의 RTL 편집 내용을 보존합니다. 보관 소스에서 실제 사용한 코드를 읽기 전용으로 확인하세요.' : '신뢰하지 않는 프로젝트입니다. 실행은 잠겨 있고 코드 편집은 가능합니다.';
     const sync = this.state.sourceSync;
-    this.manage.textContent = sync?.state === 'changed' ? '테스트 관리 · 변경 확인' : '테스트 관리';
+    this.manage.textContent = this.state.importRecovery?.length ? '설정 복구' : this.state.importJournal?.archive && this.state.importJournal.count >= 64 ? '테스트 관리 · 기록 보관' : sync?.state === 'changed' ? '테스트 관리 · 변경 확인' : '테스트 관리';
     this.sourceNotice.hidden = !!this.state.review || !sync || ['matching', 'protected'].includes(sync.state);
     this.sourceNotice.textContent = this.dirtyManifest && !this.sourceNotice.hidden
-      ? '△ 파일 구성이 바뀌었거나 비교가 불가능합니다. rtl.toml의 미저장 변경을 먼저 검토해 주세요.'
+      ? '△ 파일 구성이 바뀌었거나 비교가 불가능합니다. 프로젝트 설정의 미저장 변경을 먼저 검토해 주세요.'
       : sync?.state === 'changed' ? `△ 추가 ${sync.added.length} · 삭제/누락 ${sync.removed.length} · 새 실행 후보 ${sync.candidates.length}. 테스트 관리에서 확인·적용해 주세요. 실행은 현재 설정을 사용합니다.` : sync?.message ?? '';
     this.sourceNotice.title = sync ? [...sync.added.map(file => `추가: ${file}`), ...sync.removed.map(file => `삭제/누락: ${file}`), ...sync.candidates.map(file => `후보: ${file}`)].join('\n') : '';
-    const signature = JSON.stringify([this.state.root, this.state.tests.map(test => [test.name, test.top])]);
+    const signature = JSON.stringify([this.state.root, this.state.tests.map(test => [test.name, test.top, test.source])]);
     if (signature !== this.signature) {
-      if (this.state.root !== JSON.parse(this.signature || '[null]')[0]) { this.selected.clear(); this.chosenRuns.clear(); this.runComparisons.clear(); this.inputEpoch++; }
+      const changedRoot = this.state.root !== JSON.parse(this.signature || '[null]')[0];
+      const focus = !changedRoot && this.rows.contains(mainWindow.document.activeElement) ? mainWindow.document.activeElement as HTMLElement : undefined;
+      if (changedRoot) { this.selected.clear(); this.chosenRuns.clear(); this.runComparisons.clear(); this.inputEpoch++; this.rows.replaceChildren(); this.rowElements.clear(); }
       for (const name of this.selected) { if (!this.state.tests.some(test => test.name === name)) { this.selected.delete(name); } }
-      this.signature = signature; this.rows.replaceChildren(); this.rowElements.clear();
-      for (const test of this.state.tests) { this.addRow(test); }
+      const identities = new Map(this.state.tests.map(test => [test.name, JSON.stringify([test.top, test.source])]));
+      for (const [name, row] of this.rowElements) if (identities.get(name) !== row.identity) {
+        row.element.remove(); this.rowElements.delete(name); this.chosenRuns.delete(name);
+      }
+      for (const [index, test] of this.state.tests.entries()) {
+        if (!this.rowElements.has(test.name)) this.addRow(test);
+        const element = this.rowElements.get(test.name)!.element;
+        if (this.rows.children[index] !== element) this.rows.insertBefore(element, this.rows.children[index] ?? null);
+      }
+      this.signature = signature;
+      if (focus && this.rows.contains(focus) && mainWindow.document.activeElement !== focus) focus.focus({ preventScroll: true });
     }
     this.selection.disabled = disabled || !this.selected.size;
     for (const test of this.state.tests) {
@@ -438,6 +585,7 @@ export class RtlSimulationHome extends Disposable {
       const result = this.chosenResult(test);
       row.history.value = result?.runId ?? '';
       row.result.textContent = this.state.activeTest === test.name && this.busy ? '실행 중' : result ? `${result.runId !== test.latest?.runId ? '이전 실행 · ' : ''}${{ passed: 'PASS', failed: 'FAIL', cancelled: '취소', timedOut: '시간 초과' }[result.status]} · ${(result.durationMs / 1000).toFixed(1)}초${result.waveform ? ' · 파형 생성됨' : ''}` : '실행 전';
+      row.result.dataset.status = this.state.activeTest === test.name && this.busy ? 'running' : result?.status ?? 'idle';
       if (result?.unsavedFiles?.length) row.result.textContent += ' · 미저장 입력';
       row.result.title = [result?.message, result?.unsavedFiles?.length ? `실행 시 편집 내용을 보존한 파일:\n${result.unsavedFiles.join('\n')}` : undefined].filter(Boolean).join('\n');
       const dirty = this.state.root && this.workingCopies.dirtyWorkingCopies.some(copy => copy.resource.scheme === 'file'
@@ -447,12 +595,14 @@ export class RtlSimulationHome extends Disposable {
       const valid = explicit?.epoch === this.inputEpoch;
       const comparison = valid ? explicit.result.current : previous ? undefined : this.comparisonError ? { state: 'unavailable', message: this.comparisonError } : test.latest?.currentInputs;
       row.warning.textContent = this.dirtyManifest ? '△ 미저장 설정' : this.selectedComparison === result?.runId && !!result ? '선택한 실행 비교 중…' : explicit && !valid ? '비교 후 변경됨 · 다시 비교' : previous && !comparison ? '이전 실행 · 현재 입력 비교 미실시' : !previous && (this.comparisonPending || this.comparisonInFlight) ? '입력 비교 중…' : comparison?.state === 'changed' ? previous ? '△ 선택한 실행과 다름' : '△ 실행 후 변경됨' : comparison && ['legacy', 'unavailable'].includes(comparison.state) ? '△ 비교 불가' : comparison?.state === 'matching' ? dirty ? '현재 편집 내용 일치 · 미저장' : '현재 입력 일치' : dirty ? '△ 미저장 변경' : '';
-      row.warning.title = this.dirtyManifest ? 'rtl.toml의 미저장 변경은 실행에 사용하지 않습니다. 먼저 검토해 주세요.' : [comparison?.message, (valid ? explicit.result.saved : previous ? undefined : test.latest?.inputs)?.state === 'changed' ? '디스크에 저장된 입력은 이 실행과 다릅니다. 현재 편집 내용 비교와 별개입니다.' : undefined].filter(Boolean).join('\n');
+      row.warning.dataset.state = !this.dirtyManifest && !dirty && comparison?.state === 'matching' && (!explicit || valid) && !this.selectedComparison && !this.comparisonPending && !this.comparisonInFlight ? 'matching' : 'attention';
+      row.warning.title = this.dirtyManifest ? '프로젝트 설정의 미저장 변경은 실행에 사용하지 않습니다. 먼저 검토해 주세요.' : [comparison?.message, (valid ? explicit.result.saved : previous ? undefined : test.latest?.inputs)?.state === 'changed' ? '디스크에 저장된 입력은 이 실행과 다릅니다. 현재 편집 내용 비교와 별개입니다.' : undefined].filter(Boolean).join('\n');
       row.log.disabled = !result || this.busy;
       row.wave.disabled = !result?.waveform || !result.runId || this.openingWave;
       row.source.disabled = !result?.runId || this.busy;
-      row.compare.disabled = !result?.runId || this.busy || !!this.selectedComparison || this.dirtyManifest;
-      row.diff.disabled = !result?.runId || this.busy;
+      row.compare.disabled = !result?.runId || !this.state.project || this.busy || !!this.state.historyOnly || !!this.selectedComparison || this.dirtyManifest;
+      row.diff.disabled = !result?.runId || this.busy || !!this.state.historyOnly;
+      row.remove.disabled = listLocked || !!this.state.historyOnly || !test.source;
     }
     const output = this.displayedLog ?? this.state.log;
     if (this.log.textContent !== output) { this.log.textContent = output; }
@@ -550,28 +700,42 @@ export class RtlSimulationHome extends Disposable {
     const row = mainWindow.document.createElement('div'); row.className = 'rtl-simulation-test'; row.dataset.test = test.name;
     const check = mainWindow.document.createElement('input'); check.type = 'checkbox'; check.checked = this.selected.has(test.name); check.setAttribute('aria-label', `${test.name} 선택`);
     check.addEventListener('change', () => { if (check.checked) { this.selected.add(test.name); } else { this.selected.delete(test.name); } this.paint(); });
-    const name = this.button(test.name, () => test.source && this.editors.openEditor({ resource: URI.file(test.source) }), 'source'); name.title = test.top;
+    const name = this.button(test.name, () => test.source && this.editors.openEditor({ resource: URI.file(test.source) }), 'source'); name.title = test.top; name.disabled = !test.source;
     const result = mainWindow.document.createElement('span'); result.className = 'rtl-simulation-result';
     const warning = mainWindow.document.createElement('span'); warning.className = 'rtl-simulation-warning'; warning.setAttribute('role', 'status');
     const history = mainWindow.document.createElement('select'); history.setAttribute('aria-label', `${test.name} 실행 이력`);
     history.addEventListener('change', () => { if (history.value === this.state.tests.find(current => current.name === test.name)?.latest?.runId) { this.chosenRuns.delete(test.name); } else { this.chosenRuns.set(test.name, history.value); } this.displayedLog = undefined; this.paint(); });
-    const run = this.button('실행', () => this.start([test.name]), 'run');
-    const log = this.button('로그', async () => { this.displayedLog = await this.channel.call<string>('log', { name: test.name, runId: this.chosenResult(test)?.runId }); this.paint(); }, 'log');
-    const wave = this.button('파형', () => this.openWaveform(test.name, this.chosenResult(test)?.runId), 'waveform');
+    const run = this.iconButton(`${test.name} 실행`, () => this.start([test.name]), 'run', 'play');
+    const log = this.iconButton(`${test.name} 로그`, async () => { this.displayedLog = await this.channel.call<string>('log', { name: test.name, runId: this.chosenResult(test)?.runId }); this.paint(); }, 'log', 'terminal');
+    const wave = this.iconButton(`${test.name} 파형`, () => this.openWaveform(test.name, this.chosenResult(test)?.runId), 'waveform', 'waveform');
+    const quickActions = this.group(`${test.name} 실행과 결과`, 'rtl-simulation-quick-actions'); quickActions.append(run, log, wave);
     const source = this.button('보관 소스', () => this.openRecordedSource(test.name, this.chosenResult(test)?.runId), 'recorded-source');
     const compare = this.button('입력 비교', () => this.compareSelectedRun(test.name), 'compare-run');
     const diff = this.button('소스 차이', () => this.openRecordedSource(test.name, this.chosenResult(test)?.runId, undefined, true), 'source-diff');
-    row.append(check, name, warning, result, history, run, log, wave, source, compare, diff); this.rows.append(row); this.rowElements.set(test.name, { result, warning, history, run, log, wave, source, compare, diff });
+    const rowRoot = this.state.root, rowEpoch = this.recordedEpoch;
+    const remove = this.button('목록에서 제외', () => this.removeTest(test, rowRoot, rowEpoch), 'remove-test');
+    remove.title = 'TB 코드와 실행 이력을 보존하고, 이 TB만 자동 등록 대상에서 제외합니다.';
+    const metadata = mainWindow.document.createElement('div'); metadata.className = 'rtl-simulation-test-meta';
+    const top = mainWindow.document.createElement('span'); top.className = 'rtl-simulation-top'; top.textContent = `top · ${test.top}`;
+    metadata.append(top, result, warning, history);
+    const actions = mainWindow.document.createElement('div'); actions.className = 'rtl-simulation-test-actions';
+    const inputs = this.group(`${test.name} Source Code`, 'rtl-simulation-input-actions');
+    const inputLabel = mainWindow.document.createElement('span'); inputLabel.className = 'rtl-simulation-action-label'; inputLabel.textContent = 'Source Code';
+    inputs.append(inputLabel, source, compare, diff); actions.append(inputs, remove);
+    row.append(check, name, metadata, quickActions, actions); this.rows.append(row); this.rowElements.set(test.name, { element: row, identity: JSON.stringify([test.top, test.source]), result, warning, history, run, log, wave, source, compare, diff, remove });
   }
   private async recordedBytes(resource: URI): Promise<Uint8Array> {
-    const cached = this.recordedTexts.get(resource.toString()); if (cached) return cached;
+    if (this.stopped) throw Error('보관 소스 보기가 종료되었습니다.');
     const args = JSON.parse(resource.query);
     if (typeof args.name !== 'string' || typeof args.runId !== 'string' || typeof args.file !== 'string') throw Error('Invalid recorded source URI.');
     if (!this.state.root) await this.refresh();
-    const result = await this.channel.call<RecordedSourceText>('source-read', args);
-    const bytes = new TextEncoder().encode(result.text);
-    if ([...this.recordedTexts.values()].reduce((sum, value) => sum + value.length, 0) + bytes.length > 64 * 1024 * 1024) throw Error('보관 소스 보기의 64 MiB 한도를 초과했습니다. 앱을 다시 열어 주세요.');
-    this.recordedTexts.set(resource.toString(), bytes); return bytes;
+    const root = this.state.root, epoch = this.recordedEpoch;
+    if (!root || (args.root !== undefined && (typeof args.root !== 'string' || !extUriBiasedIgnorePathCase.isEqual(URI.file(root), URI.file(args.root))))) throw Error('프로젝트가 바뀌었습니다. 다시 선택해 주세요.');
+    return this.recordedTexts.read(resource.toString(), async () => {
+      const result = await this.channel.call<RecordedSourceText>('source-read', args);
+      if (this.stopped || this.state.root !== root || this.recordedEpoch !== epoch) throw Error('프로젝트가 바뀌었거나 보관 소스 보기가 종료되었습니다.');
+      return new TextEncoder().encode(result.text);
+    });
   }
   selectRun(name: string, id: string): void {
     const test = this.state.tests.find(test => test.name === name);
@@ -591,22 +755,25 @@ export class RtlSimulationHome extends Disposable {
     } finally { this.selectedComparison = undefined; this.paint(); }
   }
   async openRecordedSource(name: string, runId?: string, file?: string, diff = false): Promise<void> {
-    const root = this.state.root;
+    const root = this.state.root, epoch = this.recordedEpoch;
     const id = runId ?? this.state.tests.find(test => test.name === name)?.latest?.runId;
     if (!id) throw Error('실행 기록이 없습니다.');
+    if (!root || this.stopped) throw Error('프로젝트가 없거나 보관 소스 보기가 종료되었습니다.');
     const sources = await this.channel.call<RecordedSource[]>('source-list', { name, runId: id });
     const selected = file ? sources.find(source => source.file === file) : await this.quickInput.pick(sources.map(source => ({ label: source.file, description: source.unsaved ? '미저장 입력 · 읽기 전용' : '저장된 입력 · 읽기 전용', source })), { placeHolder: `${name} · 실행 ${id.slice(0, 8)}에서 사용한 소스` }).then(item => item?.source);
     if (!selected) { if (file) throw Error('이 실행에 보관된 소스가 없습니다.'); return; }
-    if (!root || this.state.root !== root) throw Error('프로젝트가 바뀌었습니다. 다시 선택해 주세요.');
-    const resource = URI.from({ scheme: 'rtl-run-source', path: `/${id}/${selected.file}`, query: JSON.stringify({ name, runId: id, file: selected.file }) });
+    const check = () => { if (this.stopped || !root || this.state.root !== root || this.recordedEpoch !== epoch) throw Error('프로젝트가 바뀌었거나 보관 소스 보기가 종료되었습니다. 다시 선택해 주세요.'); };
+    check();
+    const resource = URI.from({ scheme: 'rtl-run-source', path: `/${id}/${selected.file}`, query: JSON.stringify({ name, runId: id, file: selected.file, root }) });
     await this.recordedBytes(resource);
+    check();
     if (diff) {
       const current = URI.joinPath(URI.file(root), ...selected.file.split('/'));
       if (!await this.files.exists(current)) throw Error('현재 파일이 없습니다. 보관 소스에서 확인할 수 있습니다.');
-      if (this.state.root !== root) throw Error('프로젝트가 바뀌었습니다. 다시 선택해 주세요.');
+      check();
       await this.editors.openEditor({ original: { resource, label: `보관 ${id.slice(0, 8)}` }, modified: { resource: current, label: '현재 소스' }, label: `${selected.file} · 보관 ${id.slice(0, 8)} ↔ 현재`, options: { pinned: true } });
     } else await this.editors.openEditor({ resource, label: `${selected.file.split('/').at(-1)} · 보관 ${id.slice(0, 8)}`, description: `${name} · ${selected.unsaved ? '미저장 입력' : '저장된 입력'} · 읽기 전용`, options: { pinned: true } });
   }
-  override dispose(): void { this.stopped = true; mainWindow.clearTimeout(this.comparisonTimer); super.dispose(); }
+  override dispose(): void { this.stopped = true; this.recordedEpoch++; this.recordedTexts.dispose(); mainWindow.clearTimeout(this.comparisonTimer); super.dispose(); }
 }
 

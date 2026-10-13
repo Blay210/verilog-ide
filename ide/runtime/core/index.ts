@@ -11,3 +11,4 @@ export * from './trace';
 export * from './discovery';
 export { readImportSettings, saveImportSettings, confirmImportSettings, readImportedExecution } from './import-settings';
 export { prepareImportTargets } from './import-targets';
+export { readImportRecovery, readImportRecoveryText, resolveImportRecovery, inspectImportJournal, archiveImportJournal } from './import-publication';

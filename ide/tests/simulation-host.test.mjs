@@ -36,6 +36,37 @@ async function idle(host) {
   }
 }
 
+test('reopening a project keeps the newest run after trace/log deletion and preserves source access', async t => {
+  const dir = await fixture(t);
+  const service = new SimulationService(async () => backend(async ({ directory }) => {
+    const waveform = path.join(directory, 'managed.vcd');
+    await fs.writeFile(waveform, '$date recorded trace $end');
+    return { executable: 'fixture', cwd: directory, waveform };
+  }));
+  const original = new SimulationHostSession(() => {}, service);
+  t.after(() => original.close()); await original.inspect(dir);
+  for (let i = 0; i < 2; i++) {
+    original.start(['counter_basic'], true); await idle(original); await original.refreshInputs();
+  }
+  const latest = original.state.tests[0].latest, older = original.state.history[1];
+  assert.ok(latest.waveform); await fs.unlink(latest.waveform); await fs.unlink(latest.log);
+  const reopened = new SimulationHostSession(() => {}, service);
+  t.after(() => reopened.close()); await reopened.inspect(dir);
+  assert.equal(reopened.state.phase, 'idle');
+  assert.equal(reopened.state.history.length, 2);
+  assert.equal(reopened.state.tests[0].latest.runId, latest.runId);
+  assert.equal(reopened.state.tests[0].latest.status, 'passed');
+  assert.equal(reopened.state.tests[0].latest.waveform, undefined);
+  await assert.rejects(reopened.openWaveform(latest.name, latest.runId), /파형 파일이 없습니다/);
+  await assert.rejects(reopened.readLog(latest.name, latest.runId), /로그 파일이 없습니다/);
+  assert.equal(typeof await reopened.readLog(older.name, older.runId), 'string');
+  const files = await reopened.recordedSources(latest.name, latest.runId);
+  assert.ok(files.length > 0);
+  const source = await reopened.recordedSource(latest.name, latest.runId, files[0].file);
+  assert.ok(source.text.includes('module'));
+  assert.equal((await reopened.compareRun(latest.name, latest.runId)).saved.state, 'matching');
+});
+
 test('host forwards frozen editor inputs and retains unsaved provenance through result/history refresh', async t => {
   const dir = await fixture(t), file = path.join(dir, 'rtl/counter.sv');
   const original = await fs.readFile(file, 'utf8');

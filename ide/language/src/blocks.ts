@@ -32,6 +32,9 @@ export function planBlockEnter(text: string, offset: number, indentation: Indent
   if (scanned.context === 'comment' && !scanned.lineComment) return;
   const code = scanned.code;
   const lineStart = prefix.lastIndexOf('\n') + 1;
+  // Macro expansion can introduce an opener/closer. Preserve the old refusal
+  // on that line instead of inventing a block from its unexpanded surface.
+  if (scanCode(prefix.slice(lineStart)).hasDirective) return;
   const current = code.slice(lineStart);
   let kind: 'begin' | 'case' | undefined;
   let openerStart = lineStart;

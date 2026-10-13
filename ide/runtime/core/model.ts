@@ -27,6 +27,7 @@ export type TestStatus = 'passed' | 'failed' | 'cancelled' | 'timedOut';
 export interface TestResult {
   name: string; top: string; status: TestStatus; durationMs: number;
   directory: string; log: string; source?: string; waveform?: string; message?: string;
+  cleanupFailure?: string;
   startedAt?: string; tags?: string[]; sources?: string[];
   runId?: string; inputIdentity?: InputIdentity; traceIdentity?: TraceIdentity;
   inputSnapshot?: { version: 1; state: 'ready' | 'unavailable'; fingerprint?: string; reason?: string; unsavedFiles?: string[] };

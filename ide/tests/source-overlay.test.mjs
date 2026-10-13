@@ -41,3 +41,19 @@ test('source overlay cannot write outside the own upstream tree', () => {
   finally { sourceOverlay.pop(); }
   assert.equal(fs.readFileSync(path.join(source, 'product.json'), 'utf8'), '{}');
 });
+
+test('recorded earlier owned versions can migrate directly while unknown versions prevent every write', () => {
+  const { source, settings } = fixture(); applyPatches(source, settings);
+  const entry = sourceOverlay.find(value => value.source === 'src/rtlSimulationHome.ts'), previous = entry.previousSha256s;
+  const target = path.join(source, entry.target), owned = 'earlier owned home fixture\n';
+  entry.previousSha256s = [createHash('sha256').update(owned).digest('hex')];
+  try {
+    fs.writeFileSync(target, owned); applyPatches(source, settings);
+    assert.equal(fs.readFileSync(target, 'utf8'), fs.readFileSync(path.join(root, entry.source), 'utf8'));
+    fs.writeFileSync(target, owned + '// external change\n');
+    const patchFile = path.join(source, patches[0].file); fs.writeFileSync(patchFile, patches[0].before);
+    assert.throws(() => applyPatches(source, settings), /Source overlay differs/);
+    assert.equal(fs.readFileSync(target, 'utf8'), owned + '// external change\n');
+    assert.equal(fs.readFileSync(patchFile, 'utf8'), patches[0].before);
+  } finally { entry.previousSha256s = previous; }
+});

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { root } from '../scripts/environment.mjs';
 const require = createRequire(import.meta.url);
-const { readImportSettings, saveImportSettings, loadProject } = require('../dist/runtime/core/index.js');
+const { readImportSettings, saveImportSettings, loadProject, readImportRecovery } = require('../dist/runtime/core/index.js');
 const { SimulationHostSession } = require('../dist/runtime/host.js');
 async function fixture(t) {
   const dir = await fs.mkdtemp(path.join(root, '.dev/import-settings-'));
@@ -28,7 +28,8 @@ test('explicit role save restores a new host and keeps candidate tests unregiste
   await fresh.classify({ files: [{ path: '설계 폴더/two.sv', role: 'source' }] }); await fresh.saveReview(true);
   assert.equal((await readImportSettings(dir)).roles.files[0].role, 'source');
   assert.equal(await fs.readFile(path.join(dir, '설계 폴더/two.sv'), 'utf8'), 'module first; endmodule\nmodule second; endmodule\n');
-  assert.deepEqual(await fs.readdir(path.join(dir, '.rtl')), []);
+  assert.deepEqual(await readImportRecovery(dir), []);
+  assert.deepEqual(await fs.readdir(path.join(dir, '.rtl')), ['import-transactions']);
 });
 test('stale windows and external edits never overwrite a managed or ordinary manifest', async t => {
   const dir = await fixture(t);
@@ -57,7 +58,8 @@ test('concurrent creation has one winner; cancellation, invalid paths and damage
   await assert.rejects(cancelled, /abort/i);
   await assert.rejects(saveImportSettings(dir, saved.revision, { files: [{ path: '../escape.sv', role: 'source' }] }), /relative/);
   await assert.rejects(saveImportSettings(dir, saved.revision, { files: [{ path: '.rtl/generated.sv', role: 'source' }] }), /Generated/);
-  assert.deepEqual(await fs.readFile(file), bytes); assert.deepEqual(await fs.readdir(path.join(dir, '.rtl')), []);
+  assert.deepEqual(await fs.readFile(file), bytes); assert.deepEqual(await readImportRecovery(dir), []);
+  assert.deepEqual(await fs.readdir(path.join(dir, '.rtl')), ['import-transactions']);
   await fs.writeFile(file, 'broken = ['); await assert.rejects(readImportSettings(dir));
   await assert.rejects(saveImportSettings(dir, saved.revision, {})); assert.equal(await fs.readFile(file, 'utf8'), 'broken = [');
 });
@@ -69,7 +71,7 @@ test('read-only and linked manifests/settings directories are rejected', async t
   const external = await fixture(t); await fs.writeFile(path.join(external, 'outside.toml'), 'outside');
   await fs.unlink(file); await fs.link(path.join(external, 'outside.toml'), file);
   await assert.rejects(readImportSettings(dir), /linked/); assert.equal(await fs.readFile(path.join(external, 'outside.toml'), 'utf8'), 'outside');
-  await fs.unlink(file); await fs.rmdir(path.join(dir, '.rtl')); await fs.symlink(external, path.join(dir, '.rtl'), 'junction');
+  await fs.unlink(file); await fs.rm(path.join(dir, '.rtl'), { recursive: true }); await fs.symlink(external, path.join(dir, '.rtl'), 'junction');
   await assert.rejects(saveImportSettings(dir, 'absent', {}), /link/);
   assert.deepEqual((await fs.readdir(external)).sort(), ['outside.toml', '설계 폴더']);
   await fs.unlink(path.join(dir, '.rtl'));

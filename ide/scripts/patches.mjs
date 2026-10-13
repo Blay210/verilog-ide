@@ -46,7 +46,8 @@ export function applyPatches(source, productSettings = productConfig) {
     if (!inside(source, fs.realpathSync(ancestor))) throw Error('Source overlay destination escaped source.');
     const after = fs.readFileSync(origin, 'utf8');
     const before = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : undefined;
-    if (before !== undefined && before !== after && digest(before) !== entry.previousSha256) throw Error('Source overlay differs; review before applying.');
+    const accepted = [entry.previousSha256, ...(entry.previousSha256s ?? [])];
+    if (before !== undefined && before !== after && !accepted.includes(digest(before))) throw Error('Source overlay differs; review before applying.');
     updates.set(file, { file, before, after });
   }
   // Validate every anchor before making any change.

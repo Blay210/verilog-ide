@@ -27,6 +27,7 @@ export function planTemplate(text: string, offset: number, language: 'verilog' |
   if (offset < 0 || offset > text.length || /[\w$]/.test(text[offset] ?? '')) return;
   const prefix = text.slice(0, offset), scan = scanCode(prefix);
   if (scan.context !== 'code') return;
+  if (scanCode(prefix.slice(prefix.lastIndexOf('\n') + 1)).hasDirective) return;
   const word = /[A-Za-z_][\w$]*$/.exec(prefix)?.[0]; if (!word) return;
   const label = completion ?? word; if (!label.startsWith(word)) return;
   const start = offset - word.length, before = scan.code.slice(0, start);

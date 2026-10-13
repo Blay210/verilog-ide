@@ -97,3 +97,23 @@ test('limits and cancellation stop import; empty and existing malformed manifest
   const result = await discoverProject(root, { maxFileBytes: 1 }); assert.equal(result.sources.length, 0); assert.equal(result.warnings.length, 2);
   assert.deepEqual(await snapshot(root), before);
 });
+
+test('a source growing after stat is fully read below bounds and refused at actual file/total byte limits', async t => {
+  const root = await fixture({ 'growing.sv': 'module initial_top; endmodule\n' });
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const file = path.join(root, 'growing.sv'), originalOpen = fs.open;
+  const expanded = '// ' + 'x'.repeat(9000) + '\nmodule grown_top; endmodule\n';
+  fs.open = async (...args) => {
+    if (path.resolve(args[0]) === file) await fs.writeFile(file, expanded);
+    return originalOpen(...args);
+  };
+  t.after(() => { fs.open = originalOpen; });
+  assert.deepEqual((await discoverProject(root)).tops.map(top => top.top), ['grown_top']);
+  await fs.writeFile(file, 'module initial_top; endmodule\n');
+  const bounded = await discoverProject(root, { maxFileBytes: 8192 });
+  assert.equal(bounded.sources.length, 0);
+  assert.ok(bounded.warnings.some(warning => warning.message.includes('grew beyond')));
+  await fs.writeFile(file, 'module initial_top; endmodule\n');
+  await assert.rejects(discoverProject(root, { maxTotalBytes: 8192 }), /total byte limit/);
+  assert.equal(await fs.readFile(file, 'utf8'), expanded);
+});

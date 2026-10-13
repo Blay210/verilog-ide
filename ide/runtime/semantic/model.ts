@@ -6,7 +6,9 @@ export interface ModuleParameter { name: string; type: string; defaultValue: str
 export interface ModuleInfo { name: string; kind: string; location: SourcePoint; ports: Port[]; parameters?: ModuleParameter[] }
 export interface InstanceInfo { name: string; module: string; start: SourcePoint; end: SourcePoint; ports: Port[]; parameterStart?: SourcePoint; parameterEnd?: SourcePoint }
 export interface SemanticDiagnostic { location: SourcePoint; severity: 'error' | 'warning' | 'note'; message: string; code: string }
-export interface Analysis { modules: ModuleInfo[]; instances: InstanceInfo[]; diagnostics: SemanticDiagnostic[] }
+/** Compiler-observed files and possible include search alternatives, not a result cache. */
+export interface AnalysisInputs { files: string[]; candidates: string[]; conservative: boolean }
+export interface Analysis { modules: ModuleInfo[]; instances: InstanceInfo[]; diagnostics: SemanticDiagnostic[]; inputs?: AnalysisInputs }
 export interface DocumentOverlay { file: string; text: string }
 export interface SemanticQuery { file: string; offset: number; qualifier?: string }
 export interface CallableInfo { kind: string; returnType: string; arguments: { name: string; label: string }[] }
