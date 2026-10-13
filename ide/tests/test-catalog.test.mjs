@@ -63,7 +63,7 @@ test('untrusted/stale/escaped/linked/malformed preferences refuse changes and ab
  await assert.rejects(editTestCatalog(f.directory,'absent',{action:'file',path:'tb/counter_basic_tb.sv'}),/changed/);
  await assert.rejects(editTestCatalog(f.directory,current.revision,{action:'folder',path:'../'}),/project/);
  const controller=new AbortController();controller.abort();await assert.rejects(saveTestCatalog(f.directory,current.revision,current.policy,controller.signal));assert.deepEqual(await fs.readFile(file),before);
- await fs.symlink(path.join(f.directory,'tb'),path.join(f.directory,'linked'),'dir');await assert.rejects(editTestCatalog(f.directory,current.revision,{action:'folder',path:'linked'}),/links/);
+ await fs.symlink(path.join(f.directory,'tb'),path.join(f.directory,'linked'),process.platform==='win32'?'junction':'dir');await assert.rejects(editTestCatalog(f.directory,current.revision,{action:'folder',path:'linked'}),/links/);
  await fs.writeFile(file,'{}');await assert.rejects(loadProject(f.directory));assert.equal(await fs.readFile(file,'utf8'),'{}');
 });
 

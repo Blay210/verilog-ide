@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<title>Pulse</title><desc>A navigation star with a digital pulse cut through its center.</desc>
+<defs><clipPath id="star"><polygon points="16,3 20,12 29,16 20,20 16,29 12,20 3,16 12,12"/></clipPath></defs>
+<rect x="1" y="1" width="30" height="30" rx="7" fill="#15202b"/>
+<polygon points="16,3 20,12 29,16 20,20 16,29 12,20 3,16 12,12" fill="#f4f7fa"/>
+<path d="M16 0H32V16H16Z M0 16H16V32H0Z" fill="#58efc4" clip-path="url(#star)"/>
+<path d="M3 16L10 16L10 12L14 12L14 20L18 20L18 12L22 12L22 16L29 16" fill="none" stroke="#15202b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

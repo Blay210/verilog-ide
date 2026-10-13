@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const { SimulationService } = require('../dist/runtime/simulation.js');
 const { SimulationHostSession } = require('../dist/runtime/host.js');
 const { checkedProcess, createProject, readHistory } = require('../dist/runtime/core/index.js');
+const { blockTermination, cleanupTree } = require('./helpers/termination-control.cjs');
 const helper = path.join(root, 'tests/helpers/process-tree.cjs');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function alive(pid) {
@@ -87,27 +88,27 @@ test('deadline kills a real tree and records timedOut separately from user cance
   assert.equal(f.host.state.tests[0].latest.status, 'passed');
 });
 
-test('cleanup failure is persisted as failed, blocks further runs and rejects host close', { timeout: 20000, skip: process.platform === 'win32' }, async t => {
-  const f = await fixture(t), kill = process.kill;
+test('cleanup failure is persisted as failed, blocks further runs and rejects host close', { timeout: 20000 }, async t => {
+  const f = await fixture(t); let restore = () => {};
   t.after(() => f.host.close().catch(() => {}));
   f.tree(true); f.host.start(undefined, true); await f.entered;
   const leader = f.pids.get(2);
   try {
-    process.kill = (pid, signal) => { if (pid === -leader && signal === 'SIGKILL') { const error = Error('injected EPERM'); error.code = 'EPERM'; throw error; } return kill(pid, signal); };
+    restore = blockTermination(leader);
     f.host.cancel(); await idle(f.host);
     assert.equal(f.host.state.phase, 'error'); assert.equal(f.host.state.tests[0].latest.status, 'failed');
     assert.match(f.host.state.error, /cleanup failed/); assert.equal(f.builds(), 1);
     const [record] = await readHistory(f.directory); assert.match(record.cleanupFailure, /PID/); assert.equal(record.status, 'failed');
     await assert.rejects(f.service.run({ root: f.directory }), error => error.kind === 'cleanup');
     await assert.rejects(f.host.close(), /cleanup failed/);
-  } finally { process.kill = kill; try { kill(-leader, 'SIGKILL'); } catch {} await stopped([...f.pids.values()]); }
+  } finally { restore(); await cleanupTree([...f.pids.values()], leader); await stopped([...f.pids.values()]); }
   const recovered = new SimulationHostSession(() => {}, new SimulationService(async () => ({ id: 'verilator', capabilities: { waveforms: ['vcd'], timing: true }, check: async () => {}, build: async ({ directory }) => ({ executable: 'synthetic', cwd: directory }), run: async () => {} })));
   t.after(() => recovered.close()); await recovered.inspect(f.directory); recovered.start(['counter_basic'], true); await idle(recovered);
   assert.equal(recovered.state.tests[0].latest.status, 'passed');
 });
 
-test('cleanup failure during tool resolution is not rewritten as ordinary cancellation', { timeout: 20000, skip: process.platform === 'win32' }, async t => {
-  const f = await fixture(t), kill = process.kill; t.after(() => f.host.close());
+test('cleanup failure during tool resolution is not rewritten as ordinary cancellation', { timeout: 20000 }, async t => {
+  const f = await fixture(t); let restore = () => {}; t.after(() => f.host.close());
   let ready; const entered = new Promise(resolve => { ready = resolve; }); const pids = new Map();
   const service = new SimulationService(async context => {
     let text = '';
@@ -120,24 +121,24 @@ test('cleanup failure during tool resolution is not rewritten as ordinary cancel
   const outcome = service.run({ root: f.directory }).then(value => ({ value }), error => ({ error }));
   try {
     await entered; const leader = pids.get(2);
-    process.kill = (pid, signal) => { if (pid === -leader && signal === 'SIGKILL') { const error = Error('injected EPERM'); error.code = 'EPERM'; throw error; } return kill(pid, signal); };
+    restore = blockTermination(leader);
     service.cancel(); const { value, error } = await outcome;
     assert.equal(value, undefined); assert.equal(error.kind, 'cleanup'); assert.match(service.cleanupFailure, /PID/);
     await assert.rejects(service.run({ root: f.directory }), error => error.kind === 'cleanup');
-  } finally { process.kill = kill; const leader = pids.get(2); if (leader) { try { kill(-leader, 'SIGKILL'); } catch {} } await outcome; await stopped([...pids.values()]); }
+  } finally { restore(); await cleanupTree([...pids.values()], pids.get(2)); await outcome; await stopped([...pids.values()]); }
 });
 
-test('result write failure cannot erase a process cleanup failure or permit retry', { timeout: 20000, skip: process.platform === 'win32' }, async t => {
-  const f = await fixture(t), kill = process.kill, write = fs.writeFile;
+test('result write failure cannot erase a process cleanup failure or permit retry', { timeout: 20000 }, async t => {
+  const f = await fixture(t), write = fs.writeFile; let restore = () => {};
   t.after(() => f.host.close().catch(() => {}));
   f.tree(true); f.host.start(['counter_basic'], true); await f.entered; const leader = f.pids.get(2);
   try {
-    process.kill = (pid, signal) => { if (pid === -leader && signal === 'SIGKILL') { const error = Error('injected EPERM'); error.code = 'EPERM'; throw error; } return kill(pid, signal); };
+    restore = blockTermination(leader);
     fs.writeFile = (file, ...args) => String(file).endsWith('result.json.partial') ? Promise.reject(Error('injected result write failure')) : write(file, ...args);
     f.host.cancel(); await idle(f.host);
     assert.equal(f.host.state.phase, 'error'); assert.match(f.host.state.error, /cleanup failed.*finalization failed/);
     assert.match(f.service.cleanupFailure, /result write failure/);
     await assert.rejects(f.service.run({ root: f.directory }), error => error.kind === 'cleanup');
     assert.equal((await readHistory(f.directory)).length, 0); await assert.rejects(f.host.close(), /cleanup failed/);
-  } finally { process.kill = kill; fs.writeFile = write; try { kill(-leader, 'SIGKILL'); } catch {} await stopped([...f.pids.values()]); }
+  } finally { restore(); fs.writeFile = write; await cleanupTree([...f.pids.values()], leader); await stopped([...f.pids.values()]); }
 });

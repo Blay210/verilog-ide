@@ -33,7 +33,14 @@ export async function runProcess(spec: ProcessSpec, context: OperationContext = 
       cleanupTimer = setTimeout(() => failedCleanup('process tree exit was not confirmed within 5000 ms'), 5000);
       killing = new Promise<void>(done => {
         if (!child.pid) { done(); return; }
-        if (process.platform === 'win32') {
+        if (process.platform === 'win32' && spec.termination === 'process') {
+          // A known leaf has no descendants. Use its retained OS handle rather
+          // than taskkill's PID lookup, which races an already exiting child.
+          // A false result is never proof of success: close must still arrive
+          // before the cleanup deadline. Refusal/error remains cleanupFailed.
+          try { child.kill('SIGKILL'); } catch (error) { failedCleanup(String(error)); }
+          done();
+        } else if (process.platform === 'win32') {
           try { killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); }
           catch (error) { failedCleanup(String(error)); done(); return; }
           killer.once('error', error => { failedCleanup(`taskkill could not start: ${error.message}`); done(); });
@@ -47,7 +54,10 @@ export async function runProcess(spec: ProcessSpec, context: OperationContext = 
     };
     context.signal?.addEventListener('abort', abort, { once: true });
     if (context.signal?.aborted) abort();
-    child.once('error', error => finish(new ProcessFailure(`Could not start ${spec.executable}: ${error.message}`, cancelled)));
+    child.once('error', error => {
+      if (cancelled && spec.termination === 'process' && child.pid) failedCleanup(`leaf termination failed: ${error.message}`);
+      else finish(new ProcessFailure(`Could not start ${spec.executable}: ${error.message}`, cancelled));
+    });
     child.once('close', code => { void Promise.resolve(killing).then(() => finish(undefined, code)); });
   });
 }

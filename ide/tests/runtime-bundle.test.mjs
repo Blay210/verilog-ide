@@ -11,6 +11,12 @@ test('owned runtime bundle loads without VSIX, VS Code API or parent dependencie
   t.after(() => fs.rm(source, { recursive: true, force: true }));
   await fs.writeFile(path.join(source, 'package.json'), '{"type":"module"}');
   await prepareRuntime(source);
+  await prepareRuntime(source, { sourceBuild: true });
+  const productionFile = path.join(source, 'src/vs/platform/rtl/node/runtime.js');
+  const production = await import(pathToFileURL(productionFile).href);
+  const productionSession = production.createSimulationHost(() => {});
+  assert.equal(productionSession.state.phase, 'idle'); await productionSession.close();
+  for (const asset of ['waveform-worker.cjs', 'waveform.html', 'analyze.py']) assert.ok((await fs.stat(path.join(path.dirname(productionFile),asset))).size > 0);
   const file = path.join(source, 'out/vs/platform/rtl/node/runtime.js');
   const text = await fs.readFile(file, 'utf8');
   assert.ok(text.startsWith('// RTL IDE owned runtime bundle;'));

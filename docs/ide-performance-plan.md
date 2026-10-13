@@ -1,3 +1,7 @@
+## Windows 비화면 합성 관측 (2026-10-13 KST)
+
+[클라우드 복귀 검증](ide-windows-cloud-return.md)에서 300 RTL/100 TB/202 rows·20 add/delete를 실제 Windows Node watcher/Core/host로 관측했다. Core load 중앙값479.6ms·host refresh495.4ms·add+delete862.8ms, 반복 후 heap 약9.05MiB/RSS179.0MiB. 전체 회귀와 겹친 합성 실행으로 단독 baseline/이전 cloud 대비 개선율/전체 앱 빠릿함/장기 누수를 판정하지 않는다. 대표 실제 설계·native workbench·파형 startup/idle/edit/CPU/RSS/handle은 잔여다.
+
 # 가볍고 빠른 IDE 수용 계획 (2026-10-13)
 
 사용자는 Visual Studio/Vivado보다 VS Code/PyCharm에 가까운 가볍고 직관적인 경험을 원한다. 기능을 찾기 쉬운 기존 Code/Simulation 흐름을 유지하고, 불필요한 자원 사용과 지연을 줄이는 것을 제품 요구로 관리한다. 보기 좋은 화면이나 단일 합성 benchmark만으로 최적화 완료를 판정하지 않는다.

@@ -74,7 +74,8 @@ async function fixture(t,{source='`include ".rtl/defs.inc"\nmodule top(input log
   await fs.writeFile(manifest,'version=1\n[project]\nname="inputs"\n[sources]\nrtl=["*.sv"]\ninclude_dirs=["../external"]\n');
   await prepare?.({project,external,file,manifest});
   const bridge=path.join(directory,'bridge.py'),gate=path.join(directory,'hold');
-  await fs.writeFile(bridge,`import os,sys,json,time,runpy\nwith open(sys.argv[1]) as f: request=json.load(f)\nwith open(${JSON.stringify(path.join(directory,'starts.jsonl'))},'a') as f: f.write(json.dumps({'pid':os.getpid(),'query':bool(request.get('query')),'root':os.getcwd(),'sourceCount':len(request['sources'])})+'\\n')\nwhile os.path.exists(${JSON.stringify(gate)}): time.sleep(0.02)\nsys.argv[0]=${JSON.stringify(path.join(root,'language/python/analyze.py'))}\nrunpy.run_path(sys.argv[0],run_name='__main__')\n`);
+  const recordDirectory=path.join(directory,'starts');await fs.mkdir(recordDirectory);
+  await fs.writeFile(bridge,`import os,sys,json,time,runpy\nwith open(sys.argv[1]) as f: request=json.load(f)\nrecord_file=os.path.join(${JSON.stringify(recordDirectory)},str(time.time_ns())+'-'+str(os.getpid())+'.json')\nwith open(record_file+'.tmp','w') as f: json.dump({'pid':os.getpid(),'query':bool(request.get('query')),'root':os.getcwd(),'sourceCount':len(request['sources'])},f)\nos.replace(record_file+'.tmp',record_file)\nwhile os.path.exists(${JSON.stringify(gate)}): time.sleep(0.02)\nsys.argv[0]=${JSON.stringify(path.join(root,'language/python/analyze.py'))}\nrunpy.run_path(sys.argv[0],run_name='__main__')\n`);
   const server=path.join(directory,'server.cjs'),contents=await fs.readFile(path.join(root,before?(typeof before==='string'?before:'.dev/cloud/h7l/server-before.ts'):'language/src/server.ts'),'utf8');
   await build({stdin:{contents,loader:'ts',resolveDir:path.join(root,'language/src'),sourcefile:'server.ts'},outfile:server,bundle:true,platform:'node',format:'cjs'});
   const child=fork(server,['--node-ipc',`--clientProcessId=${process.pid}`],{silent:true,execArgv:[]});const exited=once(child,'close');let stderr='';child.stderr.on('data',bytes=>{stderr=(stderr+bytes).slice(-16000);});
@@ -82,9 +83,14 @@ async function fixture(t,{source='`include ".rtl/defs.inc"\nmodule top(input log
   const logs=[];connection.onNotification('window/logMessage',entry=>logs.push(entry.message));connection.onNotification('textDocument/publishDiagnostics',()=>{});
   connection.onRequest('client/registerCapability',async params=>{requests.push(params);await registration?.(params,{project,external});for(const item of params.registrations)registrations.set(item.id,item);return null;});
   connection.onRequest('client/unregisterCapability',params=>{for(const item of params.unregisterations)assert.equal(registrations.delete(item.id),true);return null;});connection.listen();
-  const starts=async()=>fs.readFile(path.join(directory,'starts.jsonl'),'utf8').then(text=>text.trim().split('\n').filter(Boolean).map(JSON.parse)).catch(error=>{if(error.code==='ENOENT')return[];throw error;});
+  const starts=async()=>Promise.all((await fs.readdir(recordDirectory)).filter(name=>name.endsWith('.json')).sort().map(async name=>JSON.parse(await fs.readFile(path.join(recordDirectory,name),'utf8'))));
   const stop=async()=>{if(child.exitCode!==null)return;await connection.sendRequest('rtl/prepareShutdown');assert.equal(registrations.size,0);await connection.sendRequest('shutdown');await connection.sendNotification('exit');await exited;assert.equal(child.exitCode,0,stderr);for(const {pid}of await starts())assert.throws(()=>process.kill(pid,0),{code:'ESRCH'});assert.deepEqual((await fs.readdir(cache).catch(e=>{if(e.code==='ENOENT')return[];throw e;})).filter(n=>/^(analysis|dependencies)-/.test(n)),[]);};
-  t.after(async()=>{try{await stop();}finally{connection.dispose();await fs.rm(directory,{recursive:true,force:true});}});
+  t.after(async()=>{
+    await fs.unlink(gate).catch(error=>{if(error.code!=='ENOENT')throw error;});
+    let timer;
+    try{await Promise.race([stop(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Input fixture shutdown timed out')),10000);})]);}
+    finally{clearTimeout(timer);connection.dispose();if(child.exitCode===null){child.kill();await exited;}await fs.rm(directory,{recursive:true,force:true});}
+  });
   await connection.sendRequest('initialize',{processId:process.pid,workspaceFolders:[{uri:pathToFileURL(project).href,name:'inputs'}],capabilities:{workspace:{workspaceFolders:true,...(dynamic?{didChangeWatchedFiles:{dynamicRegistration:true,relativePatternSupport:true}}:{})}},initializationOptions:{python,bridge,cache}});
   await connection.sendNotification('initialized',{});await connection.sendNotification('textDocument/didOpen',{textDocument:{uri,languageId:'systemverilog',version:1,text:source}});
   return {directory,project,external,file,manifest,uri,source,connection,registrations,requests,starts,gate,stop,logs,
@@ -176,7 +182,7 @@ test('active previous handle writes invalidate a cached Project and held queries
   assert.ok(previous);await handle.close();
   await f.watch(previous);assert.deepEqual(await pending,[]);await f.hover();assert.equal((await f.status()).label,'Analysis failed');assert.match((await f.status()).detail,/설정 복구/);assert.deepEqual(await query(),[]);
   await fs.unlink(f.gate);const [recovery]=await readImportRecovery(f.project);assert.ok(recovery);const active=await fs.readFile(f.manifest);await resolveImportRecovery(f.project,recovery,'current');assert.deepEqual(await fs.readFile(f.manifest),active);
-  await f.watch(path.join(path.dirname(previous),'acknowledged.json'),1);await f.hover();assert.equal((await f.status()).label,'Ready');assert.ok((await query()).some(item=>item.label==='local_signal'));
+  await f.watch(path.join(path.dirname(previous),'acknowledged.json'),1);await f.hover();const restoredStatus=await f.status();assert.equal(restoredStatus.label,'Ready',JSON.stringify(restoredStatus));assert.ok((await query()).some(item=>item.label==='local_signal'));
 });
 test('local document changes preserve a held query in an unrelated healthy root',async t=>{
   const source='module top; logic local_signal, loc; initial $display(loc); endmodule\n',f=await fixture(t,{source});await f.hover();
@@ -236,6 +242,7 @@ test('actual LSP generated burst preserves included generated inputs and journal
     receipt[before?'beforeJournalStatus':'afterJournalStatus']=status.label;assert.equal((await readImportRecovery(f.project)).length,1);
     await f.stop();
   }
+  await fs.mkdir(path.join(root,'.dev/cloud'),{recursive:true});
   await fs.writeFile(path.join(root,`.dev/cloud/h7l-inputs-${compareBefore?'before':'after'}.json`),JSON.stringify(receipt,null,2));
 });
 

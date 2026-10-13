@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createIcon, iconSvg } from '../scripts/icon.mjs';
 
-test('Windows chip icon has bounded multiresolution DIBs and transparent antialiased edges',()=>{
+test('Pulse icon has bounded multiresolution DIBs and transparent antialiased edges',()=>{
   const icon=createIcon();
   assert.equal(icon.readUInt16LE(2),1);
   assert.equal(icon.readUInt16LE(4),5);

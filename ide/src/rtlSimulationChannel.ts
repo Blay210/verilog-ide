@@ -6,6 +6,8 @@ import { IServerChannel } from '../../../base/parts/ipc/common/ipc.js';
 import type { SimulationHost, SimulationState, RoleSelection, ImportSelection, EditorInput, TestListEdit } from '../common/rtlSimulation.js';
 import { createSimulationHost } from './runtime.js';
 import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { FileAccess } from '../../../base/common/network.js';
 import type { WaveformQuery, WaveViewEdit, ImportRecovery, ImportRecoveryChoice, ImportArchivePlan } from '../common/rtlSimulation.js';
 
 export class RtlSimulationChannel extends Disposable implements IServerChannel {
@@ -15,7 +17,12 @@ export class RtlSimulationChannel extends Disposable implements IServerChannel {
     let session = this.sessions.get(context);
     if (!session) {
       const events = new Emitter<SimulationState>();
-      session = { events, host: createSimulationHost(state => events.fire(state), fileURLToPath(new URL('./waveform-worker.cjs', import.meta.url)), fileURLToPath(new URL('./analyze.py', import.meta.url))) };
+      // The distributor bundles this module into sharedProcessMain. Resolve
+      // resources from the application root, not the bundle's directory.
+      const asset = (name: string) => globalThis._VSCODE_FILE_ROOT
+        ? path.join(FileAccess.asFileUri('').fsPath, 'vs/platform/rtl/node', name)
+        : fileURLToPath(new URL('./' + name, import.meta.url));
+      session = { events, host: createSimulationHost(state => events.fire(state), asset('waveform-worker.cjs'), asset('analyze.py')) };
       this.sessions.set(context, session);
     }
     return session;

@@ -19,23 +19,28 @@ const code = transformSync(source, { loader: 'ts', format: 'cjs', target: 'node2
 function gate() { let release; return { promise: new Promise(resolve => { release = resolve; }), release }; }
 
 class Element {
+  attributes = new Map();
   dataset = {}; children = []; classList = { add() {}, remove() {}, toggle() {} }; listeners = new Map();
   append(...elements) { this.children.push(...elements); for (const element of elements) element.parent = this; }
   replaceChildren(...elements) { this.children = []; this.append(...elements); }
   contains(element) { return this === element || this.children.some(child => child?.contains?.(element)); }
   insertBefore(element, reference) { if(element.parent) element.parent.children=element.parent.children.filter(child=>child!==element);const index=reference ? this.children.indexOf(reference):this.children.length;this.children.splice(index,0,element);element.parent=this;return element; }
   get options() { return this.children; }
-  setAttribute() {} addEventListener(name, handler) { this.listeners.set(name, handler); }
+  setAttribute(name, value) { this.attributes.set(name, value); } addEventListener(name, handler) { this.listeners.set(name, handler); }
   removeEventListener(name) { this.listeners.delete(name); }
   remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); }
 }
 function fixture(render = false) {
   const state = new Emitter(), removed = new Emitter(), opened = [], calls = [], providers = new Map(), events = [];
   let read = async () => ({ text: 'module tb; endmodule', file: 'tb/tb.sv' }), trusted = true;
+  let inspect = async () => ({ ...home.state, revision: home.state.revision + 1, root: '/project/a' });
   const recovery = { choice: 'candidate', confirmed: true, pick: undefined, confirm: undefined, text: async args => `# ${args.choice}\n` };
   const workingCopies = { onDidChangeDirty: Event.None, onDidChangeContent: Event.None, dirtyWorkingCopies: [] };
   const channel = { listen: () => state.event, call: async (name, args) => {
     calls.push({ name, args });
+    if (name === 'inspect') return inspect();
+    if (name === 'wave-open') return { token: args.runId, runId: args.runId, name: `${args.name} · ${args.runId}`, metadata: { signals: [] } };
+    if (name === 'wave-close') return;
     if (name === 'source-read') return read(args);
     if (name === 'source-list') return [{ file: 'tb/tb.sv', unsaved: true }];
     if (name === 'import-recovery-text') { events.push('read'); return recovery.text(args); }
@@ -66,14 +71,49 @@ function fixture(render = false) {
   const files = { registerProvider: (scheme, value) => { providers.set(scheme, value); return { dispose: () => { providers.delete(scheme); } }; }, onDidFilesChange: Event.None, exists: async () => true };
   const dialogs = { confirm: async args => { events.push('confirm'); return recovery.confirm ? recovery.confirm(args) : { confirmed: recovery.confirmed }; } };
   const quickInput = { pick: async choices => { events.push('pick'); return recovery.pick ? recovery.pick(choices) : choices.find(value => value.choice === recovery.choice); } };
-  const home = new loaded.exports.RtlSimulationHome(new Element(), { getChannel: () => channel }, { onDidChangeWorkspaceFolders: Event.None },
+  const home = new loaded.exports.RtlSimulationHome(new Element(), { getChannel: () => channel }, { getWorkspace: () => ({ folders: [{ uri: URI.file('/project/a') }] }), onDidChangeWorkspaceFolders: Event.None },
     { onDidChangeTrust: Event.None, isWorkspaceTrusted: () => trusted }, {}, { openEditor: async editor => { events.push('open'); opened.push(editor); } },
     { onBeforeShutdown: Event.None, onWillShutdown: Event.None }, dialogs, quickInput, files,
     workingCopies, {}, { files: { onDidRemove: removed.event, models: [] } });
   home.accept({ revision: 1, root: '/project/a', phase: 'idle', tests: [], history: [], log: '' });
   const resource = (file = 'tb/tb.sv', project = '/project/a') => URI.from({ scheme: 'rtl-run-source', path: `/run/${file}`, query: JSON.stringify({ name: 'tb', runId: 'run', file, root: project }) });
-  return { home, calls, opened, removed, state, resource, recovery, events, workingCopies, quickInput, trust: value => { trusted = value; }, get provider() { return providers.get('rtl-run-source'); }, get recoveryProvider() { return providers.get('rtl-import-recovery'); }, read: value => { read = value; } };
+  return { home, calls, opened, removed, state, resource, recovery, events, workingCopies, quickInput, inspect: value => { inspect = value; }, trust: value => { trusted = value; }, get provider() { return providers.get('rtl-run-source'); }, get recoveryProvider() { return providers.get('rtl-import-recovery'); }, read: value => { read = value; } };
 }
+
+test('restored source stat/read joins initial project inspection before accessing retained bytes', async t => {
+  const f=fixture(),g=gate();t.after(()=>f.home.dispose());
+  f.home.accept({revision:2,phase:'idle',tests:[],log:''});
+  f.inspect(async()=>{await g.promise;return {...f.home.state,revision:3,root:'/project/a'};});
+  const first=f.provider.readFile(f.resource()),second=f.provider.stat(f.resource()),refresh=f.home.refresh();
+  assert.equal(f.calls.filter(call=>call.name==='inspect').length,1);
+  assert.equal(f.calls.filter(call=>call.name==='source-read').length,0);
+  g.release();const [bytes,stat]=await Promise.all([first,second,refresh]);
+  assert.equal(new TextDecoder().decode(bytes),'module tb; endmodule');assert.equal(stat.size,bytes.length);
+  assert.equal(f.calls.filter(call=>call.name==='source-read').length,1);
+});
+
+test('waveform tabs preserve run identity and reader lifetime while closing inactive or adjacent tabs', async () => {
+  const f = fixture();
+  await f.home.openWaveform('tb', 'run-one');
+  await f.home.openWaveform('tb', 'run-two');
+  await f.home.openWaveform('tb', 'run-three');
+  const first = f.home.documents.get('run-one'), second = f.home.documents.get('run-two'), third = f.home.documents.get('run-three');
+  assert.equal(first.label.textContent, 'tb'); assert.equal(second.label.textContent, 'tb');
+  assert.match(first.label.title, /run-one/); assert.match(second.label.title, /run-two/);
+  assert.equal(f.home.homeTab.children[0].className, 'rtl-simulation-icon rtl-icon-home');
+  const close = async item => { item.tab.children[1].listeners.get('click')(); await new Promise(setImmediate); };
+  await close(first);
+  assert.equal(third.frame.hidden, false); assert.equal(second.frame.hidden, true);
+  assert.equal(f.home.activeWave, 'run-three');
+  await close(third);
+  assert.equal(second.frame.hidden, false); assert.equal(f.home.activeWave, 'run-two');
+  assert.equal(second.label.attributes.get('aria-pressed'), 'true');
+  await close(second);
+  assert.equal(f.home.page.hidden, false); assert.equal(f.home.tabs.hidden, true);
+  assert.equal(f.home.homeTab.attributes.get('aria-pressed'), 'true');
+  assert.deepEqual(f.calls.filter(call => call.name === 'wave-close').map(call => call.args.token), ['run-one', 'run-three', 'run-two']);
+  f.home.dispose();
+});
 
 test('owned provider coalesces stat/read, returns copies, stays read-only and releases actual model-removal bytes', async t => {
   const f = fixture(); t.after(() => f.home.dispose());

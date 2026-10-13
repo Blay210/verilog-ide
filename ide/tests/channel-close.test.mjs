@@ -22,16 +22,28 @@ function fixture() {
   }
   const loaded = new Module(filename);
   loaded.require = name => name.endsWith('/event.js') ? { Emitter } : name.endsWith('/lifecycle.js') ? { Disposable }
+    : name.endsWith('/network.js') ? { FileAccess: { asFileUri: () => ({ fsPath: path.resolve('.dev/packaged-root') }) } }
     : name.endsWith('/errors.js') ? { onUnexpectedError: error => { errors.push(error); } }
-      : name === './runtime.js' ? { createSimulationHost: () => {
+      : name === './runtime.js' ? { createSimulationHost: (_notify, worker, bridge) => {
         let resolve, reject;
         const work = new Promise((yes, no) => { resolve = yes; reject = no; });
-        const host = { state: { phase: 'idle', tests: [] }, close: () => { host.closeCalls++; return work; }, closeCalls: 0, resolve, reject };
+        const host = { worker, bridge, state: { phase: 'idle', tests: [] }, close: () => { host.closeCalls++; return work; }, closeCalls: 0, resolve, reject };
         hosts.push(host); return host;
       } } : require(name);
   loaded._compile(code, filename);
   return { channel: new loaded.exports.RtlSimulationChannel(), hosts, emitters, errors };
 }
+
+test('bundled channel resolves worker and Python assets from application root', async () => {
+  const previous = globalThis._VSCODE_FILE_ROOT;
+  globalThis._VSCODE_FILE_ROOT = pathToFileURL(path.resolve('.dev/packaged-root')).href;
+  try {
+    const f = fixture(); await f.channel.call('window:1', 'state');
+    assert.equal(f.hosts[0].worker, path.resolve('.dev/packaged-root/vs/platform/rtl/node/waveform-worker.cjs'));
+    assert.equal(f.hosts[0].bridge, path.resolve('.dev/packaged-root/vs/platform/rtl/node/analyze.py'));
+    f.hosts[0].resolve(); await f.channel.call('window:1', 'close'); f.channel.dispose();
+  } finally { if(previous===undefined)delete globalThis._VSCODE_FILE_ROOT;else globalThis._VSCODE_FILE_ROOT=previous; }
+});
 
 test('explicit IPC close awaits cleanup, returns its failure and always disposes events', async () => {
   const f = fixture(); await f.channel.call('window:1', 'state');

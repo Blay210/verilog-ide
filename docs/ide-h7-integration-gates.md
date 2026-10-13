@@ -1,3 +1,15 @@
+## 실제 앱·화면 통합 / 내부 베타 빌드 준비 (2026-10-13 KST)
+
+사전 안내 후 기존 trusted 전용 창 한 세션에서 native FileService TB add/rename/delete/recreate·보관 source/diff·actual Verilator/내장 파형11개 PASS/exit0, 직접 선택 실행/Cancel·All2 PASS·로그·cursor599ps 정렬·bus/drag·Code 왕복/정상 종료를 확인했다. history29→33·원형/기존 trace 보존. development extension host 시작 지연 경고를 기록하고 DPI/고대비·group drag/긴 시간·종료 중 dialog/대형 실제 설계 등 미확인을 유지한다. 사용자 승인으로 Windows 내부 베타 배포 준비 시작: 공식 기본 경로의 불필요 Copilot 단계 중단 후 IDE 자체 build-beta 경로·resource asset/번들 상대경로 보완·Copilot/인증 확장 제외·BETA 안내 작성. 관련8+overlay3 PASS·공식 전체 타입/emission0 errors. 본체 배포 bundle 실행 중이며 ZIP/패키지 smoke/설치/공개 완료 아님. [화면 범위·근거·미검증·다음](ide-windows-integrated-ui.md). 아래는 이전 기록이다.
+
+## Windows 종료 실패·복구 검증 최신 (2026-10-13 KST)
+
+알려진 private tree의 taskkill 응답만 주입해 Windows cleanupFailed/deadline·history 실패 기록/재실행 차단·host close/tool probe/result write 경계를 확인했다. 관련 process11개:10 PASS/0 FAIL/1 POSIX SKIP·NTFS 종료/partial 보관→current 명시적 복구→재보관5개 PASS, fixture 잔류0·syntax/diff PASS. 제품 runtime 미변경으로 관련 테스트만 실행했으며 이전 전체331 PASS와 합산하지 않는다. 화면/Computer Use/설치/배포 없음. 다음은 native watcher/앱 종료·복원과 마지막 통합 화면 체크리스트 준비; 화면 시작 전 반드시 사용자에게 알림(AGENTS 반영). [구현·근거·재현·잔여](ide-windows-cleanup-recovery.md). 아래는 이전 기록이다.
+
+## Windows 복귀 비화면 수용 추가 (2026-10-13 KST)
+
+[실제 복귀 결과](ide-windows-cloud-return.md)에서 공식 본체 타입/owned emission·runtime/language·guarded migration과 NTFS 일부 회귀·actual Node channel·Windows Node OS watcher/TB202 rows를 확인했다. native Electron IPC/FileService/LanguageClient 화면 통합 전체 수용과 구분한다. CRLF 준비 알림과 legacy lease 보존을 수정했고 최초 실패·최종 전체 회귀를 별도 기록한다. 아래 P0/P1 중 아직 실제로 확인하지 않은 cleanupFailed 주입/외부 writer 경쟁·native watcher·대표 실제 설계 및 마지막 화면 수용을 계속 추적한다.
+
 # H7 잔여 수용과 마지막 Windows 통합 순서 (2026-10-13 UTC)
 
 H7A～S의 구현과 Linux 자동 근거를 유지하면서, 마지막 Windows 세션에서 확인해야 할 것을 실행 순서로 묶는다. 현재 cloud에는 Windows native 실행 근거가 없고 화면/Computer Use를 실행하지 않았다. 과거 H6D의 Windows 수용을 H7 변경 전체에 소급하지 않는다. [H7 수용표](ide-h7-acceptance-summary.md)와 [성능 계획](ide-performance-plan.md)의 상세 항목은 계속 유효하다.

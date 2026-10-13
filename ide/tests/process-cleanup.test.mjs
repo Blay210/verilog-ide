@@ -7,6 +7,7 @@ import { root } from '../scripts/environment.mjs';
 
 const require = createRequire(import.meta.url);
 const { runProcess, checkedProcess, ProcessFailure } = require('../dist/runtime/core/process.js');
+const { blockTermination, cleanupTree } = require('./helpers/termination-control.cjs');
 const helper = path.join(root, 'tests/helpers/process-tree.cjs');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 export async function alive(pid) {
@@ -42,6 +43,15 @@ test('literal arguments, nonzero exit, missing executable and pre-abort remain d
   await assert.rejects(runProcess({ executable: process.execPath, args: [helper, '2'], cwd: root }, { signal: controller.signal }), error => error instanceof ProcessFailure && error.cancelled);
 });
 
+test('owned leaf cancellation joins actual exit while the process races natural completion', { timeout: 30000 }, async () => {
+  for (let i = 0; i < 20; i++) {
+    const controller = new AbortController();
+    const result = await runProcess({ executable: process.execPath, args: ['-e', 'process.stdout.write("ready"); process.exit(0)'], cwd: root, termination: 'process' },
+      { signal: controller.signal, onLog: () => controller.abort() });
+    assert.equal(result.cancelled, true);
+  }
+});
+
 test('cancellation kills a real parent/child/grandchild group and preserves a separate peer', { timeout: 15000 }, async () => {
   const controller = new AbortController(), other = new AbortController();
   let logs = 0; const owned = tree(controller.signal, () => { logs++; }), peer = tree(other.signal);
@@ -64,37 +74,34 @@ test('POSIX cancellation cleans descendants after their leader has exited', { ti
   } finally { controller.abort(); await owned.outcome; }
 });
 
-test('failed process-group termination rejects promptly instead of hanging or claiming cancellation', { timeout: 15000, skip: process.platform === 'win32' }, async () => {
+test('failed tree termination rejects promptly instead of hanging or claiming cancellation', { timeout: 15000 }, async () => {
   const controller = new AbortController(); let logs = 0;
-  const owned = tree(controller.signal, () => { logs++; }), kill = process.kill;
+  const owned = tree(controller.signal, () => { logs++; }); let restore = () => {};
   let timer;
   try {
     await owned.entered; const leader = owned.pids.get(2);
-    process.kill = (pid, signal) => {
-      if (pid === -leader && signal === 'SIGKILL') { const error = Error('injected EPERM'); error.code = 'EPERM'; throw error; }
-      return kill(pid, signal);
-    };
+    restore = blockTermination(leader);
     controller.abort();
     const outcome = await Promise.race([owned.outcome, new Promise(resolve => { timer = setTimeout(() => resolve({ hung: true }), 1500); })]);
     assert.equal(outcome.hung, undefined, 'cleanup failure must settle instead of waiting forever');
     assert.equal(outcome.value, undefined); assert.equal(outcome.error.cleanupFailed, true); assert.match(String(outcome.error), /cleanup.*PID|PID.*cleanup/i);
     const count = logs; await pause(150); assert.equal(logs, count);
   } finally {
-    clearTimeout(timer); process.kill = kill;
-    const leader = owned.pids.get(2); if (leader) { try { kill(-leader, 'SIGKILL'); } catch {} }
+    clearTimeout(timer); restore();
+    await cleanupTree([...owned.pids.values()], owned.pids.get(2));
     await owned.outcome; await stopped([...owned.pids.values()]);
   }
 });
 
-test('accepted termination without process exit hits the bounded cleanup deadline', { timeout: 15000, skip: process.platform === 'win32' }, async () => {
-  const controller = new AbortController(), owned = tree(controller.signal), kill = process.kill;
+test('accepted termination without process exit hits the bounded cleanup deadline', { timeout: 15000 }, async () => {
+  const controller = new AbortController(), owned = tree(controller.signal); let restore = () => {};
   try {
     await owned.entered; const leader = owned.pids.get(2);
-    process.kill = (pid, signal) => pid === -leader && signal === 'SIGKILL' ? true : kill(pid, signal);
+    restore = blockTermination(leader, true);
     controller.abort(); const { error, value } = await owned.outcome;
     assert.equal(value, undefined); assert.equal(error.cleanupFailed, true); assert.match(error.message, /5000 ms/);
   } finally {
-    process.kill = kill; const leader = owned.pids.get(2); if (leader) { try { kill(-leader, 'SIGKILL'); } catch {} }
+    restore(); await cleanupTree([...owned.pids.values()], owned.pids.get(2));
     await owned.outcome; await stopped([...owned.pids.values()]);
   }
 });

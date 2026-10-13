@@ -7,6 +7,15 @@ import { requestFixture } from '../scripts/helpers/semantic-request.mjs';
 const until=async condition=>{const end=Date.now()+10000;while(Date.now()<end){if(await condition())return;await new Promise(r=>setTimeout(r,20));}throw Error('Did not reach the owned package approval boundary.');};
 const mutate=async(f,needle,replacement)=>{const file=path.join(f.directory,'instrumented.py'),source=await fs.readFile(file,'utf8');assert.equal(source.split(needle).length,2);await fs.writeFile(file,source.replace(needle,replacement));return()=>fs.writeFile(file,source);};
 
+test('CRLF package-ready notification reaches Core approval without changing compilation semantics',async t=>{
+  const f=await requestFixture({files:3});t.after(()=>f.dispose());
+  const restore=await mutate(f,"        sys.stdout.write('\\x1eRTL_PACKAGE_READY_V1\\n')","        sys.stdout.buffer.write(b'\\x1eRTL_PACKAGE_READY_V1\\r\\n')");
+  try {
+    assert.equal((await f.provider.analyze(f.project,[])).diagnostics.some(d=>d.severity==='error'),false);
+    await f.clean();
+  } finally {await restore();}
+});
+
 test('cancellation after real package publication joins the single process before any test compilation; a new call recovers',{timeout:60000},async t=>{
   const f=await requestFixture({files:3});t.after(()=>f.dispose());
   const restore=await mutate(f,'        del graph',`        del graph\n        while os.path.exists(${JSON.stringify(f.gate)}): time.sleep(0.01)`);
@@ -33,9 +42,12 @@ test('bad graph protocol and premature bridge success never return unapproved re
 test('failed atomic approval publication joins the waiting compiler and preserves fresh retry',{timeout:60000},async t=>{
   const f=await requestFixture({files:3});t.after(()=>f.dispose());
   const restore=await mutate(f,"        os.replace(channel['graph'] + '.tmp', channel['graph'])","        os.mkdir(channel['continue'])\n        os.replace(channel['graph'] + '.tmp', channel['graph'])");
+  // Hold the compiler after its notification, so rejection tests cleanup of
+  // a live owner rather than racing an unrelated Python directory-read exit.
+  const resume=await mutate(f,'        del graph',"        del graph\n        while os.path.isdir(channel['continue']): time.sleep(0.01)");
   await assert.rejects(f.provider.analyze(f.project,[]),e=>['EISDIR','EPERM','EACCES','EEXIST','ENOTEMPTY'].includes(e.code));
   assert.deepEqual((await f.rows()).filter(r=>r.groupStart).map(r=>r.operation),['dependencies']);await f.clean();
-  await restore();assert.equal((await f.provider.analyze(f.project,[])).diagnostics.some(d=>d.severity==='error'),false);await f.clean();
+  await resume();await restore();assert.equal((await f.provider.analyze(f.project,[])).diagnostics.some(d=>d.severity==='error'),false);await f.clean();
 });
 
 test('a wrong completion acknowledgement is rejected after actual compilation; manifest mode and public dependency calls remain independent',{timeout:60000},async t=>{

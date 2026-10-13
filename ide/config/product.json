@@ -1,17 +1,17 @@
 {
   "baselineSha256": "104a252a18d584b91176d24d20a12b7e08ce9225cf0cb176906928c068c1a945",
   "values": {
-    "nameShort": "RTL IDE",
-    "nameLong": "RTL IDE (Development)",
+    "nameShort": "Pulse",
+    "nameLong": "Pulse",
     "applicationName": "rtl-ide",
     "dataFolderName": ".rtl-ide",
     "sharedDataFolderName": ".rtl-ide-shared",
     "win32MutexName": "rtl-ide",
     "win32AppUserModelId": "RTLIDE.Development",
-    "win32DirName": "RTL IDE",
-    "win32NameVersion": "RTL IDE",
+    "win32DirName": "Pulse",
+    "win32NameVersion": "Pulse",
     "win32RegValueName": "RTLIDE",
-    "win32ShellNameShort": "RTL IDE",
+    "win32ShellNameShort": "Pulse",
     "win32x64AppId": "{{A267A9AE-08B2-4B9C-B951-96F472424C99}",
     "win32arm64AppId": "{{BA6931E6-0383-42B0-91BA-33E6F50B8DB1}",
     "win32x64UserAppId": "{{64C12903-7F73-457F-B148-E7C72C0EFBD2}",
@@ -100,6 +100,6 @@
     "webBuiltInExtensions",
     "reportIssueUrl"
   ],
-  "appliedSha256": "a51b7e6856c8423f0525a5b4e23ed6fbce02ea2ac5860a76b8dc18b61495a587",
-  "previousAppliedSha256": "aa014c2e7f7a488c79497e9244894a643f94c51bd678a46ca6e3e9bdd72d5c94"
+  "appliedSha256": "c2f5ba91c123eca16de8ed9e74ba77d0e744a199ef358254c26acff9f43a7584",
+  "previousAppliedSha256": "a51b7e6856c8423f0525a5b4e23ed6fbce02ea2ac5860a76b8dc18b61495a587"
 }

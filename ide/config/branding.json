@@ -1,0 +1,10 @@
+{
+  "name": "Pulse",
+  "upstreamDesktopSvgSha256": "d2625274e6d819a0a89df347bb1a4cc23b6fa5443066890043d3f926c3a32ecc",
+  "concept": "navigation star with a digital square wave",
+  "upstreamWindowsIconSha256": "f5fbea39d2e1f5e223ef2bdc1b0658b31601476ee5e9bdbec89319b81764b2be",
+  "upstreamWindowsTile70Sha256": "a0399355ce0f19952bdb2ecc0fca1268eb1da67ba8b946b47971b768998a7f97",
+  "upstreamWindowsTile150Sha256": "7b84eade934d061f380f72a3e4e081d2c859fe17d2b2dbbfbd792f0e9b8f9e15",
+  "upstreamVisualManifestSha256": "fb4780e4bae22e37cc14c29a49723025e122de26d1537e779561a05bf518d723",
+  "packagedVisualManifestSha256": "287b36ec6d34b400ec884cd95d7da070c1915265f18e13e68d9c298c2b7db648"
+}

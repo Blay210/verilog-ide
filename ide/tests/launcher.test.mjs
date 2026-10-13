@@ -20,7 +20,7 @@ test('branded cache preserves originals and always validates Electron and cached
   const target = await prepareDevelopmentExecutable(source,editor);
   assert.equal(await prepareDevelopmentExecutable(source,editor),target);
   assert.equal(edited.length,1);
-  assert.equal(edited[0]['version-string'].ProductName,'RTL IDE');
+  assert.equal(edited[0]['version-string'].ProductName,'Pulse');
   assert.equal(fs.readFileSync(target,'utf8'),'fixture executable\nbranded');
   assert.equal(fs.readFileSync(path.join(runtime, 'Code - OSS.exe'), 'utf8'), 'fixture executable');
   fs.writeFileSync(path.join(runtime,'version'),'43.7.6');
@@ -39,5 +39,5 @@ test('resource editing failure never changes official executables or leaves stag
   fs.writeFileSync(path.join(runtime,'RTL IDE.exe'),'official fixture');
   await assert.rejects(prepareDevelopmentExecutable(source,async()=>{throw Error('fixture edit failed');}),/fixture edit failed/);
   assert.equal(fs.readFileSync(path.join(runtime,'RTL IDE.exe'),'utf8'),'official fixture');
-  assert.equal(fs.readdirSync(runtime).some(name=>name.startsWith('rtl-brand-')||name.startsWith('RTL IDE Dev-')),false);
+  assert.equal(fs.readdirSync(runtime).some(name=>name.startsWith('rtl-brand-')||name.startsWith('Pulse Dev-')),false);
 });

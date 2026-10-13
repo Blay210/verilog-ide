@@ -5,7 +5,11 @@
     "previousSha256": "76fa9ee78f2842f816761fbf8ab98e3f9e8ab961248cb4e7fa713fd27fa61fef",
     "previousSha256s": [
       "695dd57691c0c1e2daaf82ea51caac279551d0f394fa63d3293f7faf5b855fa7",
-      "e9d0b6b04479d8ff4c1bb9e7fd9b4e476204c4441b8f96e2c5a92f1d58e1b115"
+      "e9d0b6b04479d8ff4c1bb9e7fd9b4e476204c4441b8f96e2c5a92f1d58e1b115",
+      "e784f6982e44e037168930783b773e4ea61c2b804f0f0fae2710aa58d785a2e4",
+      "578425576c3e0e5d3581b3ed3f3d300a19fbb0d41c54c3b1e88818db99ff6809",
+      "cb660362a2a0d059530f43042a9299c5ea4e3f24af29fcedb594812c10a020e9",
+      "f2921f7b0c5bbbceff7e845a21e49889efb66a3f571d8f42cdd8147c786408bf"
     ]
   },
   {
@@ -20,7 +24,9 @@
       "f047659e1b43d9c96568c6650d089d17a28def2b105911b49b54c49d90b668c8",
       "69f86f2e93f35e8297278dc6824361b66d20b58c5946c40f9caf3c647c6f3a80",
       "b5e78d99410da54424d6f72abbe59316b9b7fdf2f8b6830835c4f8eb8bb16c38",
-      "59bfca818b7d333d70336dfc6e5c0852c90246ea5d998c1433fc496f0afedec6"
+      "59bfca818b7d333d70336dfc6e5c0852c90246ea5d998c1433fc496f0afedec6",
+      "4865f6edb091d32e9cdc31230b6e16c61a5c3cae881624d185d40a0903c70f7c",
+      "da9695a8984d80927510e483c54a23f918c749053b99df8be58e7382d063cf27"
     ]
   },
   {
@@ -30,7 +36,8 @@
     "previousSha256s": [
       "e67d02908b018aec73152a3c11372f38bb3fc41a9504671e3e677d167badad06",
       "c9a6b6adc1559279c2645e6b229f5a0d5d462a7386da9f4490608b7600b4e341",
-      "77f99562e2a9f62e10f1c3c5fa6da6a1fa83556067226015d43c10fd71b1c593"
+      "77f99562e2a9f62e10f1c3c5fa6da6a1fa83556067226015d43c10fd71b1c593",
+      "d9bd5f772ed7b1f2ec5d15c76d641ba0ea613cfde67eaa17a12afd24438ce589"
     ]
   },
   {
@@ -100,7 +107,11 @@
   },
   {
     "source": "language/python/analyze.py",
-    "target": "extensions/rtl-language/dist/analyze.py"
+    "target": "extensions/rtl-language/dist/analyze.py",
+    "previousSha256s": [
+      "d0bb43d7cc7fcb6ce8723937bad2ac5711d6b4b1bec8f4cc051e2c17a6bad9f9",
+      "adb15de538754c1b11a76dccb0945b02583c0395240725297efbedb3d86f4315"
+    ]
   },
   {
     "source": "runtime/discovery-model.ts",

@@ -16,14 +16,14 @@ export async function prepareDevelopmentExecutable(source, editResources) {
   const expected = fs.readFileSync(path.join(source, '.npmrc'), 'utf8').match(/^target="([^"]+)"/m)?.[1];
   const actual = fs.readFileSync(path.join(runtime, 'version'), 'utf8').trim().replace(/^v/, '');
   if (!expected || actual !== expected) throw Error('Cached runtime version differs; prepare the pinned Electron before launching.');
-  const base = ['Code - OSS.exe', `${productConfig.values.nameShort}.exe`].map(name=>path.join(runtime,name)).find(file=>fs.existsSync(file));
+  const base = ['Code - OSS.exe', `${productConfig.values.nameShort}.exe`, 'RTL IDE.exe'].map(name=>path.join(runtime,name)).find(file=>fs.existsSync(file));
   if (!base) throw Error('Official development executable is missing.');
   if (!inside(runtime, fs.realpathSync(base))) throw Error('Runtime executable escaped its directory.');
   const digest = data => createHash('sha256').update(data).digest('hex');
   const icon = createIcon();
   const metadata = { ProductName: productConfig.values.nameShort, FileDescription: productConfig.values.nameLong, CompanyName: 'RTL IDE contributors', InternalName: 'rtl-ide' };
   const fingerprint = digest(Buffer.concat([fs.readFileSync(base), icon, Buffer.from(JSON.stringify(metadata))]));
-  const target = path.join(runtime, `RTL IDE Dev-${fingerprint.slice(0,16)}.exe`);
+  const target = path.join(runtime, `${productConfig.values.nameShort} Dev-${fingerprint.slice(0,16)}.exe`);
   const receiptFile = `${target}.json`;
   if (fs.existsSync(target)) {
     if (!inside(runtime, fs.realpathSync(target)) || !inside(runtime, fs.realpathSync(receiptFile))) throw Error('Branded executable escaped runtime.');

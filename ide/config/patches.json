@@ -340,5 +340,29 @@
     "file": "src/vs/code/electron-utility/sharedProcess/sharedProcessMain.ts",
     "before": "private initChannels(accessor: ServicesAccessor): void {\n\n\t\tconst instantiationService = accessor.get(IInstantiationService);",
     "after": "private initChannels(accessor: ServicesAccessor): void {\n\n\t\tconst instantiationService = accessor.get(IInstantiationService);\n\t\tif (product.applicationName === 'rtl-ide') {\n\t\t\tconst rtlSimulation = this._register(new RtlSimulationChannel());\n\t\t\tthis.server.registerChannel('rtlSimulation', rtlSimulation);\n\t\t\tthis._register(this.server.onDidRemoveConnection(connection => rtlSimulation.disconnect(connection.ctx)));\n\t\t}"
+  },
+  {
+    "id": "rtl-distribution-assets",
+    "file": "build/next/resources.ts",
+    "before": "const desktopResourcePatterns = [",
+    "after": "const desktopResourcePatterns = [\n\t'vs/platform/rtl/node/{waveform-worker.cjs,waveform.html,analyze.py}',"
+  },
+  {
+    "id": "rtl-distribution-excludes",
+    "file": "build/gulpfile.vscode.ts",
+    "before": "\t\tconst extensions = gulp.src(['.build/extensions/**', ...platformSpecificBuiltInExtensionsExclusions], { base: '.build', dot: true });",
+    "after": "\t\tconst rtlExcludes = product.applicationName === 'rtl-ide' ? ['!.build/extensions/copilot/**', '!.build/extensions/github-authentication/**', '!.build/extensions/microsoft-authentication/**'] : [];\n\t\tconst extensions = gulp.src(['.build/extensions/**', ...platformSpecificBuiltInExtensionsExclusions, ...rtlExcludes], { base: '.build', dot: true });"
+  },
+  {
+    "id": "rtl-distribution-skip-copilot-shim",
+    "file": "build/gulpfile.vscode.ts",
+    "before": "\t\tconst builtInCopilotExtensionDir = path.join(appBase, 'extensions', 'copilot');",
+    "after": "\t\tif (product.applicationName === 'rtl-ide') { return; }\n\t\tconst builtInCopilotExtensionDir = path.join(appBase, 'extensions', 'copilot');"
+  },
+  {
+    "id": "rtl-distribution-finish-task",
+    "file": "build/gulpfile.vscode.ts",
+    "before": "const buildRoot = path.dirname(root);",
+    "after": "task.task(task.define('rtl-win32-x64-finish-beta', task.series(patchWin32DependenciesTask('VSCode-win32-x64'))));\n\nconst buildRoot = path.dirname(root);"
   }
 ]

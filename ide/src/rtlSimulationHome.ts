@@ -54,8 +54,10 @@ export class RtlSimulationHome extends Disposable {
   private readonly runComparisons = new Map<string, { epoch: number; result: RunComparison }>();
   private readonly page = mainWindow.document.createElement('div');
   private readonly tabs = mainWindow.document.createElement('div');
+  private readonly homeTab: HTMLButtonElement;
+  private activeWave?: string;
   private readonly waveArea = mainWindow.document.createElement('div');
-  private readonly documents = new Map<string, { doc: WaveformDocument; frame: HTMLIFrameElement; tab: HTMLElement; test: string; views?: SavedWaveViews; editing?: boolean; rendered?: { rows: number; aligned: boolean; cursor: string } }>();
+  private readonly documents = new Map<string, { doc: WaveformDocument; frame: HTMLIFrameElement; tab: HTMLElement; label: HTMLButtonElement; test: string; views?: SavedWaveViews; editing?: boolean; rendered?: { rows: number; aligned: boolean; cursor: string } }>();
   private openingWave = false;
   private readonly all: HTMLButtonElement;
   private readonly selection: HTMLButtonElement;
@@ -69,6 +71,7 @@ export class RtlSimulationHome extends Disposable {
   private managedRevision: string | undefined;
   private signature = '';
   private loading = false;
+  private refreshPending?: Promise<void>;
   private stopped = false;
   private paintQueued = false;
   private displayedLog: string | undefined;
@@ -160,7 +163,9 @@ export class RtlSimulationHome extends Disposable {
     this.page.append(header, controls, this.importArea, tests, details);
     this.tabs.className = 'rtl-wave-tabs'; this.tabs.hidden = true;
     this.waveArea.className = 'rtl-wave-area'; this.waveArea.hidden = true;
-    this.tabs.append(this.button('Simulation 홈', () => this.showWave(), 'simulation-home'));
+    this.tabs.setAttribute('role', 'navigation'); this.tabs.setAttribute('aria-label', 'Simulation 탭');
+    this.homeTab = this.iconButton('Simulation 홈', () => this.showWave(), 'simulation-home', 'home');
+    this.homeTab.setAttribute('aria-pressed', 'true'); this.tabs.append(this.homeTab);
     container.append(this.tabs, this.page, this.waveArea);
     const receive = (event: MessageEvent) => { void this.receiveWave(event); };
     mainWindow.addEventListener('message', receive);
@@ -195,9 +200,9 @@ export class RtlSimulationHome extends Disposable {
     group.setAttribute('role', 'group'); group.setAttribute('aria-label', label);
     return group;
   }
-  private iconButton(label: string, action: () => Promise<unknown> | unknown, id: string, icon: 'play' | 'terminal' | 'waveform'): HTMLButtonElement {
+  private iconButton(label: string, action: () => Promise<unknown> | unknown, id: string, icon: 'play' | 'terminal' | 'waveform' | 'home'): HTMLButtonElement {
     const button = this.button(label, action, id);
-    button.title = icon === 'play' ? '실행' : icon === 'terminal' ? '로그' : '파형'; button.setAttribute('aria-label', label);
+    button.title = icon === 'play' ? '실행' : icon === 'terminal' ? '로그' : icon === 'home' ? 'Simulation 홈' : '파형'; button.setAttribute('aria-label', label);
     const symbol = mainWindow.document.createElement('span'); symbol.className = `rtl-simulation-icon rtl-icon-${icon}`;
     symbol.setAttribute('aria-hidden', 'true'); button.replaceChildren(symbol);
     return button;
@@ -237,9 +242,14 @@ export class RtlSimulationHome extends Disposable {
     results: [...this.rowElements].map(([name, row]) => ({ name, warning: row.warning.textContent, runId: row.history.value, historyCount: row.history.options.length })),
     waveforms: [...this.documents.values()].map(item => ({ runId: item.doc.runId, signals: item.doc.metadata.signals.length, visible: !item.frame.hidden, rendered: item.rendered })) }; }
   private showWave(runId?: string): void {
+    this.activeWave = runId;
+    this.homeTab.setAttribute('aria-pressed', String(!runId));
     this.page.hidden = !!runId; this.waveArea.hidden = !runId;
     this.container.classList.toggle('rtl-wave-open', !!runId);
-    for (const [id, item] of this.documents) { item.frame.hidden = id !== runId; item.tab.setAttribute('aria-current', String(id === runId)); }
+    for (const [id, item] of this.documents) {
+      item.frame.hidden = id !== runId; item.tab.setAttribute('aria-current', String(id === runId));
+      item.label.setAttribute('aria-pressed', String(id === runId));
+    }
   }
   private isInput(resource: URI): boolean {
     return !!this.state.root && resource.scheme === 'file' && extUriBiasedIgnorePathCase.isEqualOrParent(resource, URI.file(this.state.root)) && /\.(v|sv|vh|svh)$|[\\/](?:rtl\.toml|rtl-tests\.json)$/i.test(resource.fsPath) && !/[\\/](?:\.rtl|\.git|node_modules)([\\/]|$)/i.test(resource.fsPath);
@@ -275,12 +285,22 @@ export class RtlSimulationHome extends Disposable {
       if (this.stopped) { await this.channel.call('wave-close', { token: doc.token }); return; }
       const frame = mainWindow.document.createElement('iframe'); frame.title = `파형 ${doc.name}`;
       frame.setAttribute('sandbox', 'allow-scripts'); frame.setAttribute('referrerpolicy', 'no-referrer');
-      const tab = mainWindow.document.createElement('span');
-      tab.append(this.button(doc.name, () => this.showWave(id), 'wave-tab'), this.button('닫기', async () => {
+      const tab = mainWindow.document.createElement('span'); tab.className = 'rtl-wave-tab';
+      const record = this.state.history?.find(result => result.runId === id);
+      const detail = `${name}${record?.startedAt ? '\n' + new Date(record.startedAt).toLocaleString() : ''}\n실행 ${id}`;
+      const label = this.button(name, () => this.showWave(id), 'wave-tab'); label.title = detail;
+      label.setAttribute('aria-label', detail);
+      const close = this.button('×', async () => {
+        const wasActive = this.activeWave === id;
+        const ids = [...this.documents.keys()], index = ids.indexOf(id);
+        const adjacent = ids[index + 1] ?? ids[index - 1];
         this.documents.delete(id); frame.remove(); tab.remove(); this.tabs.hidden = !this.documents.size;
-        this.showWave(); await this.channel.call('wave-close', { token: doc.token });
-      }, 'wave-close'));
-      this.documents.set(id, { doc, frame, tab, test: name }); this.tabs.append(tab); this.tabs.hidden = false;
+        if (wasActive) this.showWave(adjacent);
+        await this.channel.call('wave-close', { token: doc.token });
+      }, 'wave-close');
+      close.title = `${name} 파형 탭 닫기`; close.setAttribute('aria-label', `${detail}\n파형 탭 닫기`);
+      tab.append(label, close);
+      this.documents.set(id, { doc, frame, tab, label, test: name }); this.tabs.append(tab); this.tabs.hidden = false;
       this.waveArea.append(frame);
       frame.src = FileAccess.asBrowserUri('vs/platform/rtl/node/waveform.html' as AppResourcePath).toString(true);
       this.showWave(id);
@@ -356,6 +376,7 @@ export class RtlSimulationHome extends Disposable {
     this.accept(await this.channel.call<SimulationState>(command, arg));
   }
   async refresh(): Promise<void> {
+    if (this.refreshPending) return this.refreshPending;
     if (this.busy || this.loading || this.stopped) { return; }
     const folders = this.workspace.getWorkspace().folders;
     if (folders.length !== 1 || folders[0].uri.scheme !== 'file') {
@@ -363,9 +384,13 @@ export class RtlSimulationHome extends Disposable {
     }
     this.loading = true; this.paint();
     this.displayedLog = undefined;
-    try { await this.call('inspect', { root: folders[0].uri.fsPath }); }
-    catch (error) { this.fail(error); }
-    finally { this.loading = false; this.scheduleComparison(); this.paint(); }
+    const work = (async () => {
+      try { await this.call('inspect', { root: folders[0].uri.fsPath }); }
+      catch (error) { this.fail(error); }
+      finally { this.loading = false; this.scheduleComparison(); this.paint(); }
+    })();
+    this.refreshPending = work;
+    try { await work; } finally { if (this.refreshPending === work) this.refreshPending = undefined; }
   }
   async start(names?: string[]): Promise<void> {
     if (!this.trust.isWorkspaceTrusted()) { this.fail('신뢰하지 않는 프로젝트에서는 실행할 수 없습니다. 코드 편집은 계속할 수 있습니다.'); return; }

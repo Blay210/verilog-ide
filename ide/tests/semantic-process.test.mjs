@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { createProtocolConnection, IPCMessageReader, IPCMessageWriter } from 'vscode-languageserver/node.js';
 import { root } from '../scripts/environment.mjs';
+await fs.mkdir(path.join(root, '.dev/cloud'), { recursive: true });
 await build({ entryPoints: ['language/src/semantic-process.ts'], outfile: '.dev/semantic-process.cjs', bundle: true, platform: 'node', format: 'cjs' });
 const require = createRequire(import.meta.url), { SemanticProcess, deadline, LanguageCleanupFailure } = require('../.dev/semantic-process.cjs');
 const { detectSemanticRuntime } = require('../dist/runtime/semantic-runtime.js');

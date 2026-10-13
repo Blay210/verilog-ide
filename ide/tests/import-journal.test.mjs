@@ -6,7 +6,7 @@ import { fork } from 'node:child_process';
 import { once } from 'node:events';
 import { root } from '../scripts/environment.mjs';
 const require = createRequire(import.meta.url), fs = require('node:fs/promises');
-const { readImportRecovery, inspectImportJournal, archiveImportJournal, readImportSettings, saveImportSettings } = require('../dist/runtime/core/index.js');
+const { readImportRecovery, inspectImportJournal, archiveImportJournal, readImportSettings, saveImportSettings, resolveImportRecovery } = require('../dist/runtime/core/index.js');
 const { populate } = require('./helpers/import-journal.cjs');
 const { acquireImportLease } = require('../dist/runtime/core/import-lease.js');
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -36,8 +36,28 @@ test('reviewed archiving preserves every file/inode and current settings, keeps 
 });
 
 test('archived handles retain late bytes without automatic gating while active retained handles still require recovery', async t => {
-  const f=await fixture(t), old=await fs.open(path.join(f.active,f.template,'previous.toml'),'r+'); t.after(()=>old.close());
-  const receipt=await archiveImportJournal(f.dir,(await inspectImportJournal(f.dir)).journal.archive);
+  const f=await fixture(t), old=await fs.open(path.join(f.active,f.template,'previous.toml'),'r+'); let closed=false; t.after(()=>closed?undefined:old.close());
+  const plan=(await inspectImportJournal(f.dir)).journal.archive;
+  if (process.platform==='win32') {
+    // NTFS refuses moving a directory with this open child handle. Preserve
+    // the active record and partial archive for explicit recovery/retry.
+    await assert.rejects(archiveImportJournal(f.dir,plan),/EPERM|EACCES|EBUSY/);
+    await old.truncate(0); await old.writeFile('late active writer'); await old.sync();
+    assert.equal(await fs.readFile(path.join(f.active,f.template,'previous.toml'),'utf8'),'late active writer');
+    const recovery=await readImportRecovery(f.dir); assert.ok(recovery.some(record=>record.id===f.template));
+    assert.equal(await fs.readFile(f.manifest,'utf8'),f.text);
+    await assert.rejects(fs.stat(path.join(f.dir,'.rtl/import-review.lock')),/ENOENT/);
+    await old.close(); closed=true;
+    await resolveImportRecovery(f.dir,recovery.find(record=>record.id===f.template),'current');
+    assert.deepEqual(await readImportRecovery(f.dir),[]);
+    const retried=await archiveImportJournal(f.dir,(await inspectImportJournal(f.dir)).journal.archive);
+    assert.equal(retried.count,1);
+    assert.equal(await fs.readFile(path.join(retried.directory,f.template,'previous.toml'),'utf8'),'late active writer');
+    assert.equal((await fs.readdir(f.active)).length,32);
+    assert.equal(await fs.readFile(f.manifest,'utf8'),f.text);
+    return;
+  }
+  const receipt=await archiveImportJournal(f.dir,plan);
   await old.truncate(0); await old.writeFile('late archived writer'); await old.sync();
   assert.equal(await fs.readFile(path.join(receipt.directory,f.template,'previous.toml'),'utf8'),'late archived writer');
   assert.deepEqual(await readImportRecovery(f.dir),[]); assert.equal(await fs.readFile(f.manifest,'utf8'),f.text);

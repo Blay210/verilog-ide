@@ -29,7 +29,10 @@ export async function semanticBurst(before = false) {
   }
   const file = path.join(directory, 'project-0/code.sv'), uri = pathToFileURL(file).href;
   const bridge = path.join(directory, 'instrument.py'), realBridge = path.join(root, 'language/python/analyze.py');
-  await fs.writeFile(bridge, `import os, sys, json, time, runpy\nbase = ${JSON.stringify(directory)}\nwith open(sys.argv[1], encoding='utf8') as f: data=json.load(f)\nkind='query' if data.get('query') else 'analysis'\nrecord={'pid':os.getpid(),'kind':kind,'sources':data['sources']}\nwith open(os.path.join(base,'starts.jsonl'),'a',encoding='utf8') as f: f.write(json.dumps(record)+'\\n')\nwhile os.path.exists(os.path.join(base,kind+'.hold')): time.sleep(0.02)\nsys.argv[0]=${JSON.stringify(realBridge)}\nrunpy.run_path(sys.argv[0],run_name='__main__')\n`);
+  const recordDirectory = path.join(directory, 'starts'); await fs.mkdir(recordDirectory);
+  // Windows text append from multiple Python processes can interleave/truncate
+  // a shared JSONL record. Publish one uniquely named complete file per start.
+  await fs.writeFile(bridge, `import os, sys, json, time, runpy\nbase = ${JSON.stringify(directory)}\nwith open(sys.argv[1], encoding='utf8') as f: data=json.load(f)\nkind='query' if data.get('query') else 'analysis'\nrecord={'pid':os.getpid(),'kind':kind,'sources':data['sources']}\nname=str(time.time_ns())+'-'+str(os.getpid())\nrecord_file=os.path.join(base,'starts',name+'.json')\nwith open(record_file+'.tmp','w',encoding='utf8') as f: json.dump(record,f)\nos.replace(record_file+'.tmp',record_file)\nwhile os.path.exists(os.path.join(base,kind+'.hold')): time.sleep(0.02)\nsys.argv[0]=${JSON.stringify(realBridge)}\nrunpy.run_path(sys.argv[0],run_name='__main__')\n`);
   const server = path.join(directory, 'server.cjs');
   const contents = await fs.readFile(before ? path.join(root, '.dev/cloud/h7j/server-before.ts') : path.join(root, 'language/src/server.ts'), 'utf8');
   await build({ stdin: { contents, loader: 'ts', resolveDir: path.join(root, 'language/src'), sourcefile: 'server.ts' }, outfile: server, bundle: true, platform: 'node', format: 'cjs' });
@@ -43,7 +46,7 @@ export async function semanticBurst(before = false) {
   connection.onNotification('window/showMessage', () => {});
   connection.onNotification('textDocument/publishDiagnostics', () => {});
   connection.listen();
-  const starts = () => fs.readFile(path.join(directory, 'starts.jsonl'), 'utf8').then(text => text.trim().split('\n').filter(Boolean).map(line => JSON.parse(line))).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
+  const starts = async () => Promise.all((await fs.readdir(recordDirectory)).filter(name => name.endsWith('.json')).sort().map(async name => JSON.parse(await fs.readFile(path.join(recordDirectory, name), 'utf8'))));
   const receipt = { directory, mode: before ? 'H7I before' : 'H7J after', scope: 'Real stdio LSP and pyslang bridge, 3 roots, 100 watch events, 20 identical concurrent completions; private process gates are not UI latency.', watchEvents: 100, completionRequests: 20 };
   try {
     await connection.sendRequest('initialize', { processId: process.pid, rootUri: folders[0].uri, workspaceFolders: folders, capabilities: { workspace: { workspaceFolders: true } }, initializationOptions: { python, bridge, cache } });
@@ -111,6 +114,7 @@ export async function semanticBurst(before = false) {
     await fs.writeFile(path.join(directory, 'receipt.json'), JSON.stringify(receipt, null, 2));
     return receipt;
   } finally {
+    for (const name of ['analysis.hold', 'query.hold']) await fs.unlink(path.join(directory, name)).catch(error => { if (error.code !== 'ENOENT') throw error; });
     if (child.exitCode === null) {
       let timer;
       try { await Promise.race([connection.sendRequest('shutdown'), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Diagnostic shutdown timed out')), 6000); })]); }

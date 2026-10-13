@@ -1,25 +1,34 @@
-// Original provisional RTL IDE artwork, shared SVG/ICO geometry.
-const pins=[10,15,20];
-const segments=[[10,18,13,18],[13,18,13,13],[13,13,18,13],[18,13,18,18],[18,18,22,18]];
+// Pulse: original vector implementation of the approved star + digital pulse concept.
+// Shared SVG/ICO geometry, flat colors and no external image/runtime dependencies.
+import { deflateSync } from 'node:zlib';
+const star=[[16,3],[20,12],[29,16],[20,20],[16,29],[12,20],[3,16],[12,12]];
+const pulse=[[3,16],[10,16],[10,12],[14,12],[14,20],[18,20],[18,12],[22,12],[22,16],[29,16]];
+const segments=pulse.slice(1).map((point,i)=>[...pulse[i],...point]);
 export const iconSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-<rect x="2" y="2" width="28" height="28" rx="7" fill="#14263d"/>
-<g fill="none" stroke="#67e8f9" stroke-width="1.6" stroke-linecap="round">
-${pins.map(p=>`<path d="M${p} 5v3 M${p} 24v3 M5 ${p}h3 M24 ${p}h3"/>`).join('\n')}
-<rect x="8" y="8" width="16" height="16" rx="2"/><path d="M10 18h3v-5h5v5h4"/>
-</g></svg>\n`;
+<title>Pulse</title><desc>A navigation star with a digital pulse cut through its center.</desc>
+<defs><clipPath id="star"><polygon points="${star.map(p=>p.join(',')).join(' ')}"/></clipPath></defs>
+<rect x="1" y="1" width="30" height="30" rx="7" fill="#15202b"/>
+<polygon points="${star.map(p=>p.join(',')).join(' ')}" fill="#f4f7fa"/>
+<path d="M16 0H32V16H16Z M0 16H16V32H0Z" fill="#58efc4" clip-path="url(#star)"/>
+<path d="M${pulse.map(p=>p.join(' ')).join('L')}" fill="none" stroke="#15202b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>\n`;
 const line=(x,y,a,b,c,d)=>{
   const t=Math.max(0,Math.min(1,((x-a)*(c-a)+(y-b)*(d-b))/((c-a)**2+(d-b)**2)));
-  return Math.hypot(x-a-t*(c-a),y-b-t*(d-b))<=.8;
+  return Math.hypot(x-a-t*(c-a),y-b-t*(d-b))<=1.2;
 };
 const rounded=(x,y,a,b,c,d,r)=>{
   const dx=Math.max(a+r-x,0,x-(c-r)),dy=Math.max(b+r-y,0,y-(d-r));
   return dx*dx+dy*dy<=r*r;
 };
 function color(x,y){
-  if(!rounded(x,y,2,2,30,30,7)) return [0,0,0,0];
-  const chip=rounded(x,y,7.2,7.2,24.8,24.8,2.8)&&!rounded(x,y,8.8,8.8,23.2,23.2,1.2);
-  const trace=segments.some(s=>line(x,y,...s))||pins.some(p=>[[p,5,p,8],[p,24,p,27],[5,p,8,p],[24,p,27,p]].some(s=>line(x,y,...s)));
-  return chip||trace?[103,232,249,255]:[20,38,61,255];
+  if(!rounded(x,y,1,1,31,31,7)) return [0,0,0,0];
+  let inside=false;
+  for(let i=0,j=star.length-1;i<star.length;j=i++){
+    const [a,b]=star[i],[c,d]=star[j];
+    if((b>y)!==(d>y)&&x<(c-a)*(y-b)/(d-b)+a)inside=!inside;
+  }
+  if(!inside||segments.some(s=>line(x,y,...s)))return [21,32,43,255];
+  return (x>=16&&y<16)||(x<16&&y>=16)?[88,239,196,255]:[244,247,250,255];
 }
 export function createIcon(sizes=[16,32,48,64,256]){
   const bodies=sizes.map(size=>{
@@ -48,4 +57,21 @@ export function createIcon(sizes=[16,32,48,64,256]){
     header.writeUInt32LE(body.length,p+8);header.writeUInt32LE(offset,p+12);offset+=body.length;
   });
   return Buffer.concat([header,...bodies]);
+}
+
+export function createPng(size=256) {
+  const icon=createIcon([size]), offset=icon.readUInt32LE(18);
+  const pixels=Buffer.alloc(size*(1+size*4));
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    const source=offset+40+((size-1-y)*size+x)*4,target=y*(1+size*4)+1+x*4;
+    pixels.set([icon[source+2],icon[source+1],icon[source],icon[source+3]],target);
+  }
+  const chunk=(name,body)=>{
+    const data=Buffer.concat([Buffer.from(name),body]);let crc=0xffffffff;
+    for(const byte of data){crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
+    const header=Buffer.alloc(4),footer=Buffer.alloc(4);header.writeUInt32BE(body.length);footer.writeUInt32BE((crc^0xffffffff)>>>0);
+    return Buffer.concat([header,data,footer]);
+  };
+  const header=Buffer.alloc(13);header.writeUInt32BE(size);header.writeUInt32BE(size,4);header[8]=8;header[9]=6;
+  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(pixels)),chunk('IEND',Buffer.alloc(0))]);
 }

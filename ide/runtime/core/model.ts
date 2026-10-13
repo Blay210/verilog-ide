@@ -6,7 +6,7 @@ export interface Project {
   waveform: WaveformFormat; tests: TestTarget[];
   packageSources?: string[]; packageOrder?: 'auto' | 'manifest'; jobs?: number;
 }
-export interface ProcessSpec { executable: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv }
+export interface ProcessSpec { executable: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv; /** Explicitly owned leaf processes only; builds/simulators default to tree cleanup. */ termination?: 'process' | 'tree' }
 export interface ProcessResult { code: number | null; output: string; cancelled: boolean }
 export interface OperationContext { signal?: AbortSignal; onLog?: (text: string) => void }
 /** Immutable UTF-8 editor content captured when execution is requested. Existing RTL files only. */

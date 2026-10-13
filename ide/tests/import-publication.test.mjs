@@ -144,8 +144,10 @@ test('an external replacement during explicit recovery is journaled rather than 
 test('journal links, unknown records, oversized metadata and retained-record limits fail closed', async t => {
   const f = await fixture(t), { request } = await conflict(f), directory = path.join(f.dir, '.rtl/import-transactions'), folder = path.join(directory, request.id);
   const candidate = path.join(folder, 'candidate.toml'), saved = await fs.readFile(candidate), outside = path.join(f.dir, 'outside');
-  await fs.writeFile(outside, saved); await fs.unlink(candidate); await fs.symlink(outside, candidate);
-  await assert.rejects(readImportRecovery(f.dir), /linked/); assert.deepEqual(await fs.readFile(outside), saved);
+  const externalFile = process.platform === 'win32' ? path.join(outside, 'saved.toml') : outside;
+  if (process.platform === 'win32') await fs.mkdir(outside);
+  await fs.writeFile(externalFile, saved); await fs.unlink(candidate); await fs.symlink(outside, candidate, process.platform === 'win32' ? 'junction' : 'file');
+  await assert.rejects(readImportRecovery(f.dir), /linked/); assert.deepEqual(await fs.readFile(externalFile), saved);
   await fs.unlink(candidate); await fs.writeFile(candidate, saved);
   const intent = path.join(folder, 'intent.json'), originalIntent = await fs.readFile(intent);
   await fs.writeFile(intent, Buffer.alloc(1048577)); await assert.rejects(readImportRecovery(f.dir), /oversized/); await fs.writeFile(intent, originalIntent);

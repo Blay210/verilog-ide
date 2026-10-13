@@ -9,7 +9,8 @@ exports.run=async()=>{
  try{
   assert.equal(vscode.workspace.isTrusted,true);const deadline=Date.now()+30000;while(!(await vscode.commands.getCommands(true)).includes('rtlIde.simulation.compareRun')){assert.ok(Date.now()<deadline);await new Promise(r=>setTimeout(r,100));}
   await vscode.commands.executeCommand('rtlIde.showSimulation');await vscode.commands.executeCommand('rtlIde.simulation.refresh');const initial=await until(s=>s.phase==='idle'&&s.tests.length===2);
-  const old=initial.history.find(run=>run.name==='tb.second'&&run.status==='passed'&&!run.unsavedFiles?.length);assert.ok(old);assert.notEqual(old.runId,initial.tests.find(t=>t.name==='tb.second').latest.runId);
+  const latestId=initial.tests.find(t=>t.name==='tb.second').latest.runId;
+  const old=initial.history.find(run=>run.name==='tb.second'&&run.status==='passed'&&!run.unsavedFiles?.length&&run.runId!==latestId);assert.ok(old);assert.notEqual(old.runId,latestId);
   const row=s=>s.results.find(r=>r.name==='tb.second');
   await vscode.commands.executeCommand('rtlIde.simulation.selectRun','tb.second',old.runId);await vscode.commands.executeCommand('rtlIde.simulation.compareRun','tb.second');
   await until(s=>row(s).runId===old.runId&&row(s).warning.includes('일치'));

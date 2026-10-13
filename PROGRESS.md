@@ -1,3 +1,35 @@
+## Pulse Setup 전달 준비 완료 (2026-10-14 KST)
+
+사용자 요청으로 검증된 기존 ZIP을 그대로 사용한 Windows x64 사용자 설치판을 생성했다. release/Pulse-Setup-windows-x64-beta-20261014.exe(260,255,047 bytes)·.sha256·installer-manifest.json; 기존 Inno6.4.1 compile exit0·PE/원본2,565 staged hash PASS·신규 payload3 PASS. 관리자 승격 없는 사용자 설치·한국어/영어·시작 메뉴/선택 desktop·uninstall 기록 방식, profile/project/PATH 보호. 앱/VSIX·이전 ZIP 미변경. 실제 설치/upgrade/uninstall 및 마법사 화면/clean Windows 미검증; 화면 검증은 새 사용자 승인을 받아 마지막 통합 세션에서 진행한다. [재현·최종 근거·다음 작업](docs/pulse-windows-installer.md). 아래는 이전 기록이다.
+
+## Pulse 스터디 내부 베타 전달 준비 완료 (2026-10-14 KST)
+
+초기 복원 provider/DOM 순서와 bundle integrity10개 metadata를 보완했다. 최신 관련23 PASS·공식 전체 타입/emission0 errors·공식25 bundle/파일/브랜드/CLI PASS. 추가 승인된 정상 앱 화면 검증은 약4분11초: 읽기 전용 보관 소스 자동 복원·tb.first 실제 PASS23.478초·내장 VCD/607ps 정렬·Code 왕복 보존·정상 닫기/잔류0 확인. 이전 전체340 PASS/1 POSIX SKIP와 native11 PASS는 별도 범위다. 최신 inventory/hash에 묶인 수용 기록으로 ZIP 전체2,565 entry 재독출/해시 검증 PASS: ide/release/Pulse-windows-x64-beta-20261014.zip(366,892,027 bytes)·.sha256·manifest.json·내부 사용 안내/전체 고지 준비 완료. clean Windows·DPI/대표 설계·장시간/RSS·FST/enum 잔여 유지; 공개 업로드/안정판 선언 없음. [최신 근거·인수인계](docs/pulse-internal-beta.md). 아래는 이전 기록이다.
+
+## Pulse 내부 베타 검증·배포 작업 중 (2026-10-14 KST)
+
+Windows 공식 후보·브랜드/타일·파일/CLI 검사 완료. 검증 계측 JSONL 손상·실패 cleanup 보완 뒤 실제 taskkill128 자연 종료 경쟁을 확인해 Python leaf의 retained handle 종료로 보완했다. 관련43 PASS/1 POSIX SKIP; 전체 회귀/공식 코드 bundle refresh 진행 중. 최종 승인된 한 화면 세션/일반 앱 수용→검증된 ZIP/해시가 남는다. [현재 상태·실패 근거·재현·다음 작업](docs/pulse-internal-beta.md). 아래는 이전 기록이다.
+
+## Pulse 브랜드 확정 (2026-10-14 KST)
+
+사용자가 Pulse를 선택했다. 독립 IDE 표시 이름과 별+디지털 파형 벡터/ICO를 반영하고 기존 내부 identity/설정·신뢰 경로는 유지한다. 관련11 PASS·script syntax PASS·PNG 산출물 관찰. 앱 화면/Windows shell 아이콘은 미검증이며 기존 배포 후보는 탭/Pulse 반영 전 버전이다. 다음 승인된 화면 통합→새 후보 build/packaged 수용→ZIP 순서. [결정·파일·검증·인수인계](docs/pulse-branding.md). 아래는 이전 기록이다.
+
+## Simulation 탭 개선 / 배포 후보 현황 (2026-10-14 KST)
+
+홈은 고정 집 아이콘, 파형 탭은 TB 이름만 표시·실행 ID/시각 tooltip·내부 ×·테마 색/한 줄 스크롤로 정리했다. 비활성 닫기 보존/활성 인접 이동/마지막 홈·reader 해제 회귀 포함 관련18 PASS·공식 전체 타입/owned emission0 errors. 화면 미검증·기존 배포 후보는 수정 전 버전. 직전 배포 후처리/파일/CLI PASS·packaged native11 PASS/실제 파형 화면 확인 뒤 사용자가 Esc로 중지했으며 물리 클릭/정상 종료·ZIP는 미완료다. Computer Use/visible 검증은 매번 사용자 확인을 받아 진행한다. [상세·근거·다음 작업](docs/ide-simulation-tabs.md). 아래는 이전 기록이다.
+
+## 실제 앱·화면 통합 / 내부 베타 빌드 준비 (2026-10-13 KST)
+
+사전 안내 후 기존 trusted 전용 창 한 세션에서 native FileService TB add/rename/delete/recreate·보관 source/diff·actual Verilator/내장 파형11개 PASS/exit0, 직접 선택 실행/Cancel·All2 PASS·로그·cursor599ps 정렬·bus/drag·Code 왕복/정상 종료를 확인했다. history29→33·원형/기존 trace 보존. development extension host 시작 지연 경고를 기록하고 DPI/고대비·group drag/긴 시간·종료 중 dialog/대형 실제 설계 등 미확인을 유지한다. 사용자 승인으로 Windows 내부 베타 배포 준비 시작: 공식 기본 경로의 불필요 Copilot 단계 중단 후 IDE 자체 build-beta 경로·resource asset/번들 상대경로 보완·Copilot/인증 확장 제외·BETA 안내 작성. 관련8+overlay3 PASS·공식 전체 타입/emission0 errors. 본체 배포 bundle 실행 중이며 ZIP/패키지 smoke/설치/공개 완료 아님. [화면 범위·근거·미검증·다음](docs/ide-windows-integrated-ui.md). 아래는 이전 기록이다.
+
+## Windows 종료 실패·복구 검증 최신 (2026-10-13 KST)
+
+알려진 private tree의 taskkill 응답만 주입해 Windows cleanupFailed/deadline·history 실패 기록/재실행 차단·host close/tool probe/result write 경계를 확인했다. 관련 process11개:10 PASS/0 FAIL/1 POSIX SKIP·NTFS 종료/partial 보관→current 명시적 복구→재보관5개 PASS, fixture 잔류0·syntax/diff PASS. 제품 runtime 미변경으로 관련 테스트만 실행했으며 이전 전체331 PASS와 합산하지 않는다. 화면/Computer Use/설치/배포 없음. 다음은 native watcher/앱 종료·복원과 마지막 통합 화면 체크리스트 준비; 화면 시작 전 반드시 사용자에게 알림(AGENTS 반영). [구현·근거·재현·잔여](docs/ide-windows-cleanup-recovery.md). 아래는 이전 기록이다.
+
+## Windows 클라우드 복귀 검증 (2026-10-13 KST)
+
+클라우드 최신 HEAD 878ad84에서 기존 Windows 환경으로 복귀했다. 알려진 이전 분석기 LF/CRLF 소유 hash migration, Python 준비 알림 CRLF 인식, legacy lease 파일 보호를 보완하고 NTFS 열린 handle·junction·검증 artifact/승인 거절 fixture를 Windows에 맞게 검증했다. 공식 전체 본체 타입/owned emission0 errors·runtime/language build·최종 bundle 준비 PASS, actual Node channel4묶음·Windows OS TB 이벤트/202 rows 반복 PASS(자동 도구0·설정 보존). 최초 전체 실패와 분리10항목 PASS를 보존했고 최종 Windows 전체337개:331 PASS/0 FAIL/6 POSIX SKIP·241.5초/exit0 및 actual Verilator 두 예제×VCD/FST4회 PASS·원본/보관 hash/생성물 격리를 확인했다. 화면/Computer Use/native workbench·배포·설치·commit/push 없음. P0 추가 cleanup/NTFS와 P1 native watcher/마지막 한 화면 통합·실제 설계 성능 gate 유지. [근거·보완·재현·남은 순서](docs/ide-windows-cloud-return.md). 아래는 이전 기록이다.
+
 ## 클라우드 통합 준비 최신 (2026-10-13 KST)
 
 사용자 PC 없이 pinned upstream root/build frozen type 의존성과 checksum Electron 선언을 준비해 공식 TS7 7.0.2 본체 전체 타입·owned 출력 **0 errors/exit0**, runtime/language build를 확인했다. 홈 미사용 import를 제거하고 이전 owned hash를 보존했다. 실제 Node channel4묶음·TB file/folder rename/빈 폴더 재생성·20 add/delete/202 rows·idle/도구0/설정 불변,100 late caller의 한 후속 scan과 close join/무게시를 검증했다. 작은 소스 읽기 chunk를4–64KiB로 조정해 같은 선택 hash/read806회의 buffer 할당52.8→3.30MB(**93.75% 감소**), 최종 관련20 PASS/0 FAIL/0 SKIP. 버퍼 변경 후 최종 순차 전체 회귀 **335 PASS/0 FAIL/1 Windows batch SKIP(총336개)**. 합성 단독 계측의 Core 중앙값/반복 tail은 개선 미확인이며 전체 RSS/Windows UI 성능으로 확대하지 않는다. install_script/start_skill 초안을 추가 저장했고 게시/새 task 복원은 별도다. Windows native IPC/watcher/NTFS/taskkill·마지막 화면/대표 실제 설계 성능 및 별도 FST/전체 disk 정책 잔여를 유지한다. [변경·근거·재현·제한](docs/ide-cloud-integration-preparation.md). 아래는 이전 기록이다.

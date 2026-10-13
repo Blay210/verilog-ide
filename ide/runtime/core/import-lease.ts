@@ -30,6 +30,10 @@ export async function acquireImportLease(directory: string, signal?: AbortSignal
     finally { await file.close(); }
     for (let attempt = 0; attempt < 4; attempt++) {
       signal?.throwIfAborted(); await safe(directory);
+      // Windows rename can replace an existing ordinary file with a directory.
+      // Preserve legacy locks before attempting to publish our owned lease.
+      const existing = await lstat(canonical).catch(error => { if (missing(error)) return undefined; throw error; });
+      if (existing && (!existing.isDirectory() || existing.isSymbolicLink())) throw Error('Import settings are busy: legacy or unknown lock. Confirm its owner has stopped before manual recovery.');
       try { await rename(prepared, canonical); published = true; return () => cleanup(canonical); }
       catch (error) {
         if (!occupied(error)) throw error;

@@ -4,10 +4,10 @@ import { build } from 'esbuild';
 import { root, inside } from './environment.mjs';
 import { randomBytes } from 'node:crypto';
 
-/** Development-only owned bundle, never a sibling project or user-extension input. */
-export async function prepareRuntime(source = path.join(root, 'upstream')) {
+/** Owned runtime assets for development output or the source-based distributor. */
+export async function prepareRuntime(source = path.join(root, 'upstream'), options = {}) {
   if (!inside(root, fs.realpathSync(source))) throw Error('Runtime source escaped IDE.');
-  const directory = path.join(source, 'out/vs/platform/rtl/node');
+  const directory = path.join(source, options.sourceBuild ? 'src/vs/platform/rtl/node' : 'out/vs/platform/rtl/node');
   let ancestor = directory;
   while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
   if (!inside(source, fs.realpathSync(ancestor))) throw Error('Runtime target escaped source.');

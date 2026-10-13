@@ -15,3 +15,7 @@ __pycache__/
 # Reproducible upstream source, prepared by the pinned bootstrap
 /upstream/
 /.upstream-tags.txt
+
+# Independent Windows distribution output and local beta archives
+/VSCode-win32-x64/
+/release/

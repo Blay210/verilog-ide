@@ -1,3 +1,35 @@
+## Pulse Setup 전달 준비 완료 (2026-10-14 KST)
+
+사용자 요청으로 검증된 기존 ZIP을 그대로 사용한 Windows x64 사용자 설치판을 생성했다. release/Pulse-Setup-windows-x64-beta-20261014.exe(260,255,047 bytes)·.sha256·installer-manifest.json; 기존 Inno6.4.1 compile exit0·PE/원본2,565 staged hash PASS·신규 payload3 PASS. 관리자 승격 없는 사용자 설치·한국어/영어·시작 메뉴/선택 desktop·uninstall 기록 방식, profile/project/PATH 보호. 앱/VSIX·이전 ZIP 미변경. 실제 설치/upgrade/uninstall 및 마법사 화면/clean Windows 미검증; 화면 검증은 새 사용자 승인을 받아 마지막 통합 세션에서 진행한다. [재현·최종 근거·다음 작업](../docs/pulse-windows-installer.md). 아래는 이전 기록이다.
+
+## Pulse 내부 베타 전달 최신 (2026-10-14 KST)
+
+Windows 공식 후보·일반 앱 자동 보관 source 복원/실제 PASS/내장 파형·작업 공간 보존/정상 닫기를 확인했고, ZIP2,565 entry 전체 재독출/hash 검사 PASS다. 스터디 전달 파일은 release/Pulse-windows-x64-beta-20261014.zip·.sha256·manifest.json. source/provider early 등록과 Restored 이후 DOM, bundle integrity10개 갱신을 유지한다. 전체340 PASS/1 POSIX SKIP 이후 관련23 PASS와 공식 타입0 errors를 구분한다. clean Windows·대표 설계/장시간 등은 잔여다. [최종 근거·인수인계](../docs/pulse-internal-beta.md). 아래는 이전 기록이다.
+
+## Pulse 내부 베타 검증·배포 작업 중 (2026-10-14 KST)
+
+Windows 공식 후보·브랜드/타일·파일/CLI 검사 완료. 검증 계측 JSONL 손상·실패 cleanup 보완 뒤 실제 taskkill128 자연 종료 경쟁을 확인해 Python leaf의 retained handle 종료로 보완했다. 관련43 PASS/1 POSIX SKIP; 전체 회귀/공식 코드 bundle refresh 진행 중. 최종 승인된 한 화면 세션/일반 앱 수용→검증된 ZIP/해시가 남는다. [현재 상태·실패 근거·재현·다음 작업](../docs/pulse-internal-beta.md). 아래는 이전 기록이다.
+
+## Pulse 브랜드 확정 (2026-10-14 KST)
+
+사용자가 Pulse를 선택했다. 독립 IDE 표시 이름과 별+디지털 파형 벡터/ICO를 반영하고 기존 내부 identity/설정·신뢰 경로는 유지한다. 관련11 PASS·script syntax PASS·PNG 산출물 관찰. 앱 화면/Windows shell 아이콘은 미검증이며 기존 배포 후보는 탭/Pulse 반영 전 버전이다. 다음 승인된 화면 통합→새 후보 build/packaged 수용→ZIP 순서. [결정·파일·검증·인수인계](../docs/pulse-branding.md). 아래는 이전 기록이다.
+
+## Simulation 탭 개선 / 배포 후보 현황 (2026-10-14 KST)
+
+홈은 고정 집 아이콘, 파형 탭은 TB 이름만 표시·실행 ID/시각 tooltip·내부 ×·테마 색/한 줄 스크롤로 정리했다. 비활성 닫기 보존/활성 인접 이동/마지막 홈·reader 해제 회귀 포함 관련18 PASS·공식 전체 타입/owned emission0 errors. 화면 미검증·기존 배포 후보는 수정 전 버전. 직전 배포 후처리/파일/CLI PASS·packaged native11 PASS/실제 파형 화면 확인 뒤 사용자가 Esc로 중지했으며 물리 클릭/정상 종료·ZIP는 미완료다. Computer Use/visible 검증은 매번 사용자 확인을 받아 진행한다. [상세·근거·다음 작업](../docs/ide-simulation-tabs.md). 아래는 이전 기록이다.
+
+## 실제 앱·화면 통합 / 내부 베타 빌드 준비 (2026-10-13 KST)
+
+사전 안내 후 기존 trusted 전용 창 한 세션에서 native FileService TB add/rename/delete/recreate·보관 source/diff·actual Verilator/내장 파형11개 PASS/exit0, 직접 선택 실행/Cancel·All2 PASS·로그·cursor599ps 정렬·bus/drag·Code 왕복/정상 종료를 확인했다. history29→33·원형/기존 trace 보존. development extension host 시작 지연 경고를 기록하고 DPI/고대비·group drag/긴 시간·종료 중 dialog/대형 실제 설계 등 미확인을 유지한다. 사용자 승인으로 Windows 내부 베타 배포 준비 시작: 공식 기본 경로의 불필요 Copilot 단계 중단 후 IDE 자체 build-beta 경로·resource asset/번들 상대경로 보완·Copilot/인증 확장 제외·BETA 안내 작성. 관련8+overlay3 PASS·공식 전체 타입/emission0 errors. 본체 배포 bundle 실행 중이며 ZIP/패키지 smoke/설치/공개 완료 아님. [화면 범위·근거·미검증·다음](../docs/ide-windows-integrated-ui.md). 아래는 이전 기록이다.
+
+## Windows 종료 실패·복구 검증 최신 (2026-10-13 KST)
+
+알려진 private tree의 taskkill 응답만 주입해 Windows cleanupFailed/deadline·history 실패 기록/재실행 차단·host close/tool probe/result write 경계를 확인했다. 관련 process11개:10 PASS/0 FAIL/1 POSIX SKIP·NTFS 종료/partial 보관→current 명시적 복구→재보관5개 PASS, fixture 잔류0·syntax/diff PASS. 제품 runtime 미변경으로 관련 테스트만 실행했으며 이전 전체331 PASS와 합산하지 않는다. 화면/Computer Use/설치/배포 없음. 다음은 native watcher/앱 종료·복원과 마지막 통합 화면 체크리스트 준비; 화면 시작 전 반드시 사용자에게 알림(AGENTS 반영). [구현·근거·재현·잔여](../docs/ide-windows-cleanup-recovery.md). 아래는 이전 기록이다.
+
+## Windows 복귀 최신 (2026-10-13 KST)
+
+공통 docs/ide-windows-cloud-return.md가 cloud H7A～S/TB 자동 목록 이후 Windows 비화면 인수인계다. runtime/language·guarded overlay/bundle·공식 본체 emission/type·Node channel·Windows OS TB 목록 workload를 확인하고 CRLF 알림/legacy lease 보호를 보완했다. docs/handoff.md와 docs/ide-h7-integration-gates.md의 P0/P1 잔여를 따르며 화면 점유 검증은 마지막 통합 세션까지 실행하지 않는다. 아래 H6D/H3 등은 이전 기록이고 TB 자동 목록의 현재 계약은 docs/ide-tb-auto-catalog.md다.
+
 ## H6D 최신 — 과거 run 명시적 비교·소스 차이 (2026-10-12)
 
 선택 이력 ‘입력 비교’→saved/current 상태 분리·runId 바인딩·buffer 동결·root/epoch/선택 guard·편집 후 다시 비교, ‘소스 차이’→읽기 전용 보관/현재 편집기·삭제 파일 무생성을 연결했다. 최신 비교/결과·history 보존, 전체 history 자동 반복 검사 없음. 최종145 PASS/0 FAIL/0 SKIP·runtime/language build·공식 전체 본체 타입0 errors/emission3파일0 errors. trusted native4시나리오/exit0: 과거 matching→dirty 무효화/changed→실제 diff/삭제 package 거절→복구 matching·원형/최신 runId/history29/창 보존, 새 시뮬레이션 없음. Core gated 프로젝트 변경/요청 동결 수용, UI 진행 중 물리 race/규모 등은 별도. 다음 H6 수용표/잔여 범위 판정→H7 안정화. clean Windows/FST/enum/encoding·물리/복원 등 gate 유지·H6/베타 전체 아님·배포 없음. [근거·범위·다음 작업](../docs/ide-h6d-selected-run-comparison.md). 아래는 역사다.

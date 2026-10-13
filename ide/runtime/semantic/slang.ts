@@ -18,7 +18,7 @@ export class SlangProvider implements SemanticProvider {
     try {
       const input = path.join(directory, 'input.json'), output = path.join(directory, 'output.json');
       await writeFile(input, JSON.stringify({ operation: 'dependencies', sources: project.sources, includeDirs: project.includeDirs, defines: defines(project), overlays }));
-      await checkedProcess({ executable: this.python, args: ['-I', '-B', this.bridge, input, output], cwd: project.root }, { ...context, signal: context.signal ? AbortSignal.any([context.signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000) });
+      await checkedProcess({ executable: this.python, termination: 'process', args: ['-I', '-B', this.bridge, input, output], cwd: project.root }, { ...context, signal: context.signal ? AbortSignal.any([context.signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000) });
       return JSON.parse(await readFile(output, 'utf8')) as PackageGraph;
     } finally { await rm(directory, { recursive: true, force: true }); }
   }
@@ -57,10 +57,10 @@ export class SlangProvider implements SemanticProvider {
       let notification = '';
       // Attach both outcomes immediately. Every exit, including a rejected Core
       // graph or failed continuation write, joins checkedProcess before cleanup.
-      joined = checkedProcess({ executable: this.python, args: ['-I', '-B', this.bridge, input, output], cwd: project.root },
+      joined = checkedProcess({ executable: this.python, termination: 'process', args: ['-I', '-B', this.bridge, input, output], cwd: project.root },
         { signal: operationSignal, onLog: automatic ? chunk => {
           notification = (notification + chunk).slice(-128);
-          if (notification.includes('\u001eRTL_PACKAGE_READY_V1\n')) announce();
+          if (/\u001eRTL_PACKAGE_READY_V1\r?\n/.test(notification)) announce();
         } : undefined }).then(() => { outcome = {}; }, error => { outcome = { error }; });
       if (automatic) {
         // An owned stdout notification avoids polling disk while slang starts.

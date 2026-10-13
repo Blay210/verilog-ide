@@ -19,7 +19,7 @@ Root docs hold shared plans. Existing implementation lives in vsix/; independent
 
 # Verification scheduling (2026-10-12)
 
-Continue implementation and non-interactive build/tests normally. Batch Computer Use and any visible native-app verification into one final integrated session after implementation and ordinary validation; do not repeatedly occupy the user's screen during feature work. Track deferred UI checks explicitly as unverified in the validation notes. Preserve existing windows, profiles and trust settings.
+Continue implementation and non-interactive build/tests normally. Batch Computer Use and any visible native-app verification into one final integrated session after implementation and ordinary validation; do not repeatedly occupy the user's screen during feature work. Obtain explicit user confirmation before starting Computer Use or visible app verification (explicit request, 2026-10-14); notification alone is insufficient. Track deferred UI checks explicitly as unverified in the validation notes. Preserve existing windows, profiles and trust settings.
 
 # Cloud handoff entry
 
