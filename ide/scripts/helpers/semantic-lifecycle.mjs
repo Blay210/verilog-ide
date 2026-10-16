@@ -10,7 +10,7 @@ export const tick = () => new Promise(resolve => setImmediate(resolve));
 /** Real owned adapter/queue; editor and client API boundaries are modeled. */
 export async function lifecycleFixture({ before = false, probe, start, stop, drain } = {}) {
   const directory = await fs.mkdtemp(path.join(root, '.dev/semantic-lifecycle-'));
-  const key = directory, stats = { probes: 0, clients: 0, starts: 0, stops: 0, drains: 0, processes: 0, logs: [], watches: [] }, subscriptions = [], commands = new Map(), clients = [], processes = [];
+  const key = directory, stats = { probes: 0, clients: 0, starts: 0, stops: 0, drains: 0, processes: 0, logs: [], watches: [], executions: [] }, subscriptions = [], commands = new Map(), clients = [], processes = [];
   let configuration, trust;
   const api = {
     StatusBarAlignment: { Right: 1 },
@@ -19,7 +19,7 @@ export async function lifecycleFixture({ before = false, probe, start, stop, dra
       onDidGrantWorkspaceTrust: fn => { trust = fn; return { dispose() {} }; },
       onDidChangeConfiguration: fn => { configuration = fn; return { dispose() {} }; },
       createFileSystemWatcher: pattern => { stats.watches.push(pattern); return { pattern, dispose() {} }; } },
-    commands: { registerCommand: (name, fn) => { commands.set(name, fn); return { dispose() {} }; }, executeCommand: async () => {} },
+    commands: { registerCommand: (name, fn) => { commands.set(name, fn); return { dispose() {} }; }, executeCommand: async (...args) => { stats.executions.push(args); } },
     window: { state: { focused: true }, activeTextEditor: undefined,
       createStatusBarItem: () => ({ hide() {}, show() {}, dispose() {} }),
       onDidChangeActiveTextEditor: () => ({ dispose() {} }), onDidChangeWindowState: () => ({ dispose() {} }),
@@ -31,6 +31,8 @@ export async function lifecycleFixture({ before = false, probe, start, stop, dra
   }
   class CleanupFailure extends Error { cleanupFailed = true; }
   class Client {
+    notifications = new Map();
+    onNotification(method, handler) { this.notifications.set(method, handler); return { dispose: () => this.notifications.delete(method) }; }
     constructor(id, name, factory, options) { stats.clients++; this.factory = factory; this.options = options; clients.push(this); }
     async start() {
       stats.starts++; if (typeof this.factory === 'function') await this.factory();

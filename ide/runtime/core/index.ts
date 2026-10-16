@@ -12,3 +12,4 @@ export * from './discovery';
 export { readImportSettings, saveImportSettings, confirmImportSettings, readImportedExecution } from './import-settings';
 export { prepareImportTargets } from './import-targets';
 export { readImportRecovery, readImportRecoveryText, resolveImportRecovery, inspectImportJournal, archiveImportJournal } from './import-publication';
+export { createSourceProject, initializeSourceProject, validateProjectName } from './workspace-project';

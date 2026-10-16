@@ -65,7 +65,7 @@ test('failed registration is reported to concurrent callers and can retry; faile
   await watches.close();assert.equal(releases,3);
 });
 
-async function fixture(t,{source='`include ".rtl/defs.inc"\nmodule top(input logic [`WIDTH-1:0] a); endmodule\n',dynamic=true,before=false,registration,prepare}={}) {
+async function fixture(t,{source='`include ".rtl/defs.inc"\nmodule top(input logic [`WIDTH-1:0] a); endmodule\n',dynamic=true,before=false,registration,prepare,semanticSessions=false,interactiveEditing=false,holdModels=false}={}) {
   const python=process.env.RTL_SEMANTIC_PYTHON;assert.ok(python,'Use the verified existing runtime; no silent skip.');
   const directory=await fs.mkdtemp(path.join(root,'.dev/h7l-lsp-')),project=path.join(directory,'project'),external=path.join(directory,'external'),cache=path.join(directory,'cache');
   await fs.mkdir(path.join(project,'.rtl'),{recursive:true});await fs.mkdir(external);
@@ -76,24 +76,31 @@ async function fixture(t,{source='`include ".rtl/defs.inc"\nmodule top(input log
   const bridge=path.join(directory,'bridge.py'),gate=path.join(directory,'hold');
   const recordDirectory=path.join(directory,'starts');await fs.mkdir(recordDirectory);
   await fs.writeFile(bridge,`import os,sys,json,time,runpy\nwith open(sys.argv[1]) as f: request=json.load(f)\nrecord_file=os.path.join(${JSON.stringify(recordDirectory)},str(time.time_ns())+'-'+str(os.getpid())+'.json')\nwith open(record_file+'.tmp','w') as f: json.dump({'pid':os.getpid(),'query':bool(request.get('query')),'root':os.getcwd(),'sourceCount':len(request['sources'])},f)\nos.replace(record_file+'.tmp',record_file)\nwhile os.path.exists(${JSON.stringify(gate)}): time.sleep(0.02)\nsys.argv[0]=${JSON.stringify(path.join(root,'language/python/analyze.py'))}\nrunpy.run_path(sys.argv[0],run_name='__main__')\n`);
+  const modelGate=path.join(directory,'hold-model'),modelEntered=path.join(directory,'model-entered');
+  if(holdModels) {
+    const source=await fs.readFile(bridge,'utf8'),anchor="runpy.run_path(sys.argv[0],run_name='__main__')";
+    assert.equal(source.split(anchor).length,2);
+    await fs.writeFile(bridge,source.replace(anchor,`ns=runpy.run_path(sys.argv[0])\noriginal_model=ns['analyze']\nmodel_count=0\ndef held_model(value,retained=None):\n global model_count\n model_count+=1\n if model_count>1:\n  with open(${JSON.stringify(modelEntered)},'w') as f: f.write('entered')\n  while os.path.exists(${JSON.stringify(modelGate)}): time.sleep(0.02)\n return original_model(value,retained)\nns['editor_session'].__globals__['analyze']=held_model\nns['editor_session'](request)`));
+  }
   const server=path.join(directory,'server.cjs'),contents=await fs.readFile(path.join(root,before?(typeof before==='string'?before:'.dev/cloud/h7l/server-before.ts'):'language/src/server.ts'),'utf8');
   await build({stdin:{contents,loader:'ts',resolveDir:path.join(root,'language/src'),sourcefile:'server.ts'},outfile:server,bundle:true,platform:'node',format:'cjs'});
   const child=fork(server,['--node-ipc',`--clientProcessId=${process.pid}`],{silent:true,execArgv:[]});const exited=once(child,'close');let stderr='';child.stderr.on('data',bytes=>{stderr=(stderr+bytes).slice(-16000);});
   const connection=createProtocolConnection(new IPCMessageReader(child),new IPCMessageWriter(child));const registrations=new Map(),requests=[];
-  const logs=[];connection.onNotification('window/logMessage',entry=>logs.push(entry.message));connection.onNotification('textDocument/publishDiagnostics',()=>{});
+  const logs=[],diagnostics=[],ready=[];connection.onNotification('window/logMessage',entry=>logs.push(entry.message));connection.onNotification('textDocument/publishDiagnostics',entry=>diagnostics.push(entry));connection.onNotification('rtl/analysisReady',entry=>ready.push(entry));
   connection.onRequest('client/registerCapability',async params=>{requests.push(params);await registration?.(params,{project,external});for(const item of params.registrations)registrations.set(item.id,item);return null;});
   connection.onRequest('client/unregisterCapability',params=>{for(const item of params.unregisterations)assert.equal(registrations.delete(item.id),true);return null;});connection.listen();
   const starts=async()=>Promise.all((await fs.readdir(recordDirectory)).filter(name=>name.endsWith('.json')).sort().map(async name=>JSON.parse(await fs.readFile(path.join(recordDirectory,name),'utf8'))));
   const stop=async()=>{if(child.exitCode!==null)return;await connection.sendRequest('rtl/prepareShutdown');assert.equal(registrations.size,0);await connection.sendRequest('shutdown');await connection.sendNotification('exit');await exited;assert.equal(child.exitCode,0,stderr);for(const {pid}of await starts())assert.throws(()=>process.kill(pid,0),{code:'ESRCH'});assert.deepEqual((await fs.readdir(cache).catch(e=>{if(e.code==='ENOENT')return[];throw e;})).filter(n=>/^(analysis|dependencies)-/.test(n)),[]);};
   t.after(async()=>{
     await fs.unlink(gate).catch(error=>{if(error.code!=='ENOENT')throw error;});
+    await fs.unlink(modelGate).catch(error=>{if(error.code!=='ENOENT')throw error;});
     let timer;
     try{await Promise.race([stop(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Input fixture shutdown timed out')),10000);})]);}
     finally{clearTimeout(timer);connection.dispose();if(child.exitCode===null){child.kill();await exited;}await fs.rm(directory,{recursive:true,force:true});}
   });
-  await connection.sendRequest('initialize',{processId:process.pid,workspaceFolders:[{uri:pathToFileURL(project).href,name:'inputs'}],capabilities:{workspace:{workspaceFolders:true,...(dynamic?{didChangeWatchedFiles:{dynamicRegistration:true,relativePatternSupport:true}}:{})}},initializationOptions:{python,bridge,cache}});
+  await connection.sendRequest('initialize',{processId:process.pid,workspaceFolders:[{uri:pathToFileURL(project).href,name:'inputs'}],capabilities:{workspace:{workspaceFolders:true,...(dynamic?{didChangeWatchedFiles:{dynamicRegistration:true,relativePatternSupport:true}}:{})}},initializationOptions:{python,bridge,cache,semanticSessions,interactiveEditing}});
   await connection.sendNotification('initialized',{});await connection.sendNotification('textDocument/didOpen',{textDocument:{uri,languageId:'systemverilog',version:1,text:source}});
-  return {directory,project,external,file,manifest,uri,source,connection,registrations,requests,starts,gate,stop,logs,
+  return {directory,project,external,file,manifest,uri,source,connection,registrations,requests,starts,gate,modelGate,modelEntered,stop,logs,diagnostics,ready,
     hover:()=>connection.sendRequest('textDocument/hover',{textDocument:{uri},position:{line:source.split('\n').findIndex(line=>line.includes('module top')),character:8}}),
     status:(target=uri)=>connection.sendRequest('rtl/languageStatus',{uri:target}),
     watch:(file,type=2)=>connection.sendNotification('workspace/didChangeWatchedFiles',{changes:[{uri:pathToFileURL(file).href,type}]})};
@@ -110,6 +117,204 @@ test('compiler inputs union nested/macro headers and independent tests; unrelate
   assert.equal(result.inputs.files.some(input=>key(input)===key(other)),false);
   assert.ok(result.inputs.candidates.includes(path.join(f.project,'.rtl/nested.inc')));
   assert.equal(result.modules.find(m=>m.name==='top').ports[0].type,'logic[5:0]');
+});
+
+test('interactive editing never flushes pending analysis and coalesces changes behind a gated compiler', async t => {
+  const source='module top; logic old_signal; initial $display(old_signal); endmodule\n';
+  const f=await fixture(t,{source,semanticSessions:true,interactiveEditing:true});
+  await fs.writeFile(f.gate,'hold');
+  await until(async()=>(await f.starts()).length>0,async()=>JSON.stringify({status:await f.status(),logs:f.logs}));
+  const original=(await f.starts())[0], query=text=>f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position:{line:0,character:text.indexOf('$display(')+9}});
+  const latencies=[];
+  const fastQuery=async text=>{const start=performance.now();const result=await query(text);latencies.push(performance.now()-start);return result;};
+  let timer;
+  try { assert.deepEqual(await Promise.race([fastQuery(source),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Completion incorrectly waited for the gated compiler')),3000);})]),{isIncomplete:true,items:[]}); } finally {clearTimeout(timer);}
+  let edited=source;
+  for(let version=2;version<=12;version++) {
+    edited=source.replaceAll('old_signal','latest_signal_'+version);
+    await f.connection.sendNotification('textDocument/didChange',{textDocument:{uri:f.uri,version},contentChanges:[{text:edited}]});
+    assert.deepEqual(await fastQuery(edited),{isIncomplete:true,items:[]});
+  }
+  // Let the quiet timer expire while analysis is still blocked: no overlap or
+  // per-key process termination, and no stale symbols/diagnostics publication.
+  await new Promise(resolve=>setTimeout(resolve,550));
+  assert.equal((await f.starts()).length,1); assert.doesNotThrow(()=>process.kill(original.pid,0));
+  let [metrics]=await f.connection.sendRequest('rtl/languagePerformance');
+  assert.equal(metrics.starts,1); assert.equal(metrics.queued,true); assert.equal(f.ready.length,0);
+  await fs.unlink(f.gate);
+  await until(()=>f.ready.some(entry=>entry.version===12),f.status);
+  assert.ok(f.ready.every(entry=>entry.version===12),'obsolete model must not announce readiness');
+  const candidates=await query(edited);
+  assert.ok(candidates.some(item=>item.label==='latest_signal_12'));
+  assert.ok(!candidates.some(item=>item.label==='old_signal'));
+  [metrics]=await f.connection.sendRequest('rtl/languagePerformance');
+  assert.equal(metrics.starts,2);assert.equal(metrics.obsolete,1);assert.equal(metrics.queued,false);
+  const sorted=[...latencies].sort((a,b)=>a-b);
+  await fs.writeFile(path.join(root,'.dev/windows-integrated/pulse-edit-scheduling-measurement.json'),JSON.stringify({platform:process.platform,kind:'gated LSP fixture, not physical editor latency',edits:11,requests:latencies.length,latenciesMs:latencies,p50Ms:sorted[Math.floor(sorted.length*.5)],p95Ms:sorted[Math.ceil(sorted.length*.95)-1],analysisJobs:metrics.starts,obsoleteJobs:metrics.obsolete,compilerStarts:(await f.starts()).length},null,2)+'\n');
+  assert.equal(await fs.readFile(f.file,'utf8'),source);
+  await f.stop();assert.deepEqual(await fs.readdir(path.join(f.directory,'cache')),[]);
+});
+
+test('semantic colors and port candidates remain available while a changed compiler model is gated',async t=>{
+ const source='`timescale 1ns/1ps\nmodule child(input logic clk,input logic enable,input logic reset); endmodule\nmodule top; child u(.clk()); endmodule\n';
+ const f=await fixture(t,{source,semanticSessions:true,interactiveEditing:true,holdModels:true});await until(()=>f.ready.length>0,f.status);
+ const tokens=()=>f.connection.sendRequest('textDocument/semanticTokens/full',{textDocument:{uri:f.uri}});
+ const original=await tokens();assert.equal(original.data.length,15,'two definitions and the child instance type');
+ await fs.writeFile(f.modelGate,'hold');await fs.unlink(f.modelEntered).catch(error=>{if(error.code!=='ENOENT')throw error;});
+ const edited=source.replace('.clk()', '.clk(),\n  .');
+ await f.connection.sendNotification('textDocument/didChange',{textDocument:{uri:f.uri,version:2},contentChanges:[{text:edited}]});
+ const offset=edited.indexOf('\n  .')+4,position={line:edited.slice(0,offset).split('\n').length-1,character:3};
+ const query=()=>f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position,context:{triggerKind:2,triggerCharacter:'.'}});
+ assert.deepEqual((await tokens()).data,original.data,'dirty request must not erase unchanged semantic colors');
+ const began=performance.now(),quick=await query(),dirtyMs=performance.now()-began;assert.equal(quick.isIncomplete,true);
+ assert.deepEqual(quick.items.map(item=>item.label).sort(),['enable','reset']);assert.ok(quick.items.every(item=>item.textEdit.newText.endsWith('(${1})$0')));
+ await until(()=>fs.access(f.modelEntered).then(()=>true,()=>false),f.status);
+ assert.deepEqual((await tokens()).data,original.data,'active rebuild must not erase the mapped snapshot');
+ const heldBegan=performance.now(),held=await query(),heldMs=performance.now()-heldBegan;
+ assert.deepEqual(held.items.map(item=>item.label).sort(),['enable','reset']);
+ await fs.writeFile(path.join(root,'.dev/windows-integrated/pulse-continuity-measurement.json'),JSON.stringify({platform:process.platform,kind:'gated real compiler/LSP fixture, not physical editor or representative project latency',dirtyCompletionMs:dirtyMs,heldRebuildCompletionMs:heldMs,moduleTokens:original.data.length/5,previewCandidates:held.items.length},null,2)+'\n');
+ assert.equal(f.ready.some(entry=>entry.version===2),false,'preview must not announce fresh analysis');
+ assert.equal(await f.connection.sendRequest('textDocument/hover',{textDocument:{uri:f.uri},position:{line:2,character:14}}),null,'preview is not fresh hover authority');
+ await fs.unlink(f.modelGate);await until(()=>f.ready.some(entry=>entry.version===2),f.status);
+ assert.equal((await tokens()).data.length,15);assert.deepEqual((await query()).map(item=>item.label).sort(),['enable','reset']);
+ // A real dependency event must discard presentation candidates immediately.
+ await fs.writeFile(f.modelGate,'hold');await f.watch(f.manifest);
+ assert.deepEqual((await tokens()).data,[]);assert.deepEqual(await query(),{isIncomplete:true,items:[]});
+ await fs.unlink(f.modelGate);await f.stop();
+});
+
+test('project module names complete at a new malformed instance while analysis is gated',async t=>{
+ const source='module top;\n  counter u_counter(.clk());\nendmodule\n';
+ const f=await fixture(t,{source,semanticSessions:true,interactiveEditing:true,holdModels:true,
+   prepare:async({project})=>fs.writeFile(path.join(project,'counter.sv'),'module counter(input logic clk,output logic [7:0] count); endmodule\n')});
+ await until(()=>f.ready.length>0,f.status);await fs.writeFile(f.modelGate,'hold');
+ const edited=source.replace('endmodule','  counter c1(.clk(), .count())\n  counter ();\n  coun\nendmodule');
+ await f.connection.sendNotification('textDocument/didChange',{textDocument:{uri:f.uri,version:2},contentChanges:[{text:edited}]});
+ const query=text=>{const offset=text.lastIndexOf('\n  coun')+'\n  coun'.length;return f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position:{line:text.slice(0,offset).split('\n').length-1,character:6}});};
+ const quick=await query(edited),items=Array.isArray(quick)?quick:quick.items;
+ assert.ok(items.some(item=>item.label==='counter'),'first use at a new position must not depend on a cached completion query');
+ assert.equal(items.find(item=>item.label==='counter').textEdit.newText,'counter ${1} (${2});$0');
+ assert.equal(items.find(item=>item.label==='counter').kind,7);
+ assert.equal(items.filter(item=>item.label==='counter').length,1);
+ await fs.unlink(f.modelGate);await until(()=>f.ready.some(entry=>entry.version===2),f.status);
+ assert.ok((await query(edited)).some(item=>item.label==='counter'),'parser recovery must not hide known project definitions');
+ await fs.unlink(path.join(f.project,'counter.sv'));await f.watch(path.join(f.project,'counter.sv'),3);
+ const removed=await query(edited);assert.ok(!(Array.isArray(removed)?removed:removed.items).some(item=>item.label==='counter'),'deleted input cannot retain a project module name');
+ await f.stop();
+});
+
+test('qualified candidate pool survives identifier typing without joining a compiler rebuild',async t=>{
+ const source='package cfg; parameter int WIDTH=8; parameter int DEPTH=4; endpackage\nmodule top; initial $display(cfg::WIDTH); endmodule\n';
+ const f=await fixture(t,{source,semanticSessions:true,interactiveEditing:true,holdModels:true});await until(()=>f.ready.length>0,f.status);
+ const query=text=>{const offset=text.indexOf('::')+2+(text.includes('::DE')?2:0);return f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position:{line:1,character:offset-text.indexOf('\n')-1}});};
+ const initial=await query(source);assert.ok(initial.some(item=>item.label==='DEPTH'));
+ await fs.writeFile(f.modelGate,'hold');
+ const edited=source.replace('::WIDTH','::DE');await f.connection.sendNotification('textDocument/didChange',{textDocument:{uri:f.uri,version:2},contentChanges:[{text:edited}]});
+ const preview=await query(edited);assert.equal(preview.isIncomplete,true);assert.deepEqual(preview.items.map(item=>item.label),initial.map(item=>item.label));
+ const changed=edited.replace('cfg::','wrong::');await f.connection.sendNotification('textDocument/didChange',{textDocument:{uri:f.uri,version:3},contentChanges:[{text:changed}]});
+ assert.deepEqual(await query(changed),{isIncomplete:true,items:[]},'a different qualifier cannot inherit a cached pool');
+ await fs.unlink(f.modelGate);await f.stop();
+});
+
+test('automatic package and port trigger requests return full visible candidate pools for local narrowing',async t=>{
+ const source='package settings_pkg; parameter int WIDTH=8; typedef logic [7:0] word_t; int counter; endpackage\nmodule child(input logic clk,input logic enable,input logic reset); endmodule\nmodule top; logic local_signal; child u(.clk(),.enable()); initial $display(local_signal,settings_pkg::WIDTH); endmodule\n';
+ const f=await fixture(t,{source,semanticSessions:true,interactiveEditing:true});await until(()=>f.ready.length>0,f.status);
+ const pos=offset=>({line:source.slice(0,offset).split('\n').length-1,character:offset-(source.lastIndexOf('\n',offset-1)+1)});
+ const query=(offset,triggerCharacter)=>f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position:pos(offset),context:{triggerKind:2,triggerCharacter}});
+ const ordinary=await query(source.indexOf('$display(local_signal')+'$display(loc'.length,undefined);
+ assert.ok(ordinary.some(item=>item.label==='local_signal'));assert.ok(ordinary.some(item=>item.label==='settings_pkg'));assert.ok(ordinary.some(item=>item.label==='child'));
+ const pkg=await query(source.indexOf('settings_pkg::WIDTH')+'settings_pkg::'.length,':');
+ for(const name of ['WIDTH','word_t','counter'])assert.ok(pkg.some(item=>item.label===name),name);
+ const narrowed=await query(source.indexOf('settings_pkg::WIDTH')+'settings_pkg::W'.length,undefined);
+ assert.deepEqual(narrowed.map(item=>item.label),pkg.map(item=>item.label),'the editor receives the pool rather than a new prefix-specific subset');
+ const ports=await query(source.indexOf('.enable')+'.en'.length,'.');
+ assert.ok(ports.some(item=>item.label==='enable'));assert.ok(ports.some(item=>item.label==='reset'));assert.ok(!ports.some(item=>item.label==='clk'));
+ assert.ok(ports.every(item=>item.kind===5));
+ const editing=source.replace('.enable()', '.');
+ await f.connection.sendNotification('textDocument/didChange',{textDocument:{uri:f.uri,version:2},contentChanges:[{text:editing}]});
+ await until(()=>f.ready.some(entry=>entry.version===2),f.status);
+ const afterDot=await query(editing.indexOf('.clk(),.')+'.clk(),.'.length,'.');
+ assert.ok(afterDot.some(item=>item.label==='enable'),'bare dot in an unfinished named connection');
+ assert.ok(afterDot.some(item=>item.label==='reset'));assert.ok(!afterDot.some(item=>item.label==='clk'));
+ await f.stop();
+});
+
+test('interactive warm worker coalesces edits during a rebuild and publishes only the final input model', async t => {
+  const source='module top; logic value_1; initial $display(value_1); endmodule\n';
+  const f=await fixture(t,{source,semanticSessions:true,interactiveEditing:true,holdModels:true});
+  await until(()=>f.ready.length>0,async()=>JSON.stringify({status:await f.status(),logs:f.logs}));
+  const starts=(await f.starts()).length,pid=(await f.starts())[0].pid;
+  await fs.rm(f.modelEntered,{force:true});await fs.writeFile(f.modelGate,'hold');
+  const edit=version=>f.connection.sendNotification('textDocument/didChange',{textDocument:{uri:f.uri,version},contentChanges:[{text:source.replaceAll('value_1','value_'+version)}]});
+  await edit(2);await until(()=>fs.stat(f.modelEntered).then(()=>true,()=>false));
+  for(let version=3;version<=7;version++)await edit(version);
+  await new Promise(resolve=>setTimeout(resolve,550));
+  assert.equal((await f.starts()).length,starts);assert.doesNotThrow(()=>process.kill(pid,0));
+  assert.deepEqual(await f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position:{line:0,character:source.indexOf('$display')+9}}),{isIncomplete:true,items:[]});
+  await fs.unlink(f.modelGate);await until(()=>f.ready.some(entry=>entry.version===7),f.status);
+  assert.ok(f.ready.every(entry=>entry.version===1||entry.version===7));
+  const result=await f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position:{line:0,character:source.indexOf('$display')+9}});
+  assert.ok(result.some(item=>item.label==='value_7'));assert.ok(!result.some(item=>item.label==='value_1'));
+  const [metrics]=await f.connection.sendRequest('rtl/languagePerformance');assert.equal(metrics.metrics.processStarts,1);assert.ok(metrics.metrics.rebuilds>=2);assert.equal(metrics.obsolete,1);
+  assert.equal((await f.starts()).length,starts);assert.equal(await fs.readFile(f.file,'utf8'),source);
+  await f.stop();assert.deepEqual(await fs.readdir(path.join(f.directory,'cache')),[]);
+});
+
+test('interactive shutdown joins the active compiler and drops the queued latest edit', async t => {
+  const source='module top; logic value; endmodule\n';
+  const f=await fixture(t,{source,semanticSessions:true,interactiveEditing:true});
+  await fs.writeFile(f.gate,'hold');await until(async()=>(await f.starts()).length>0);
+  await f.connection.sendNotification('textDocument/didChange',{textDocument:{uri:f.uri,version:2},contentChanges:[{text:source.replace('value','new_value')}]});
+  await new Promise(resolve=>setTimeout(resolve,550));
+  await f.stop();assert.equal((await f.starts()).length,1);assert.equal(f.ready.length,0);
+  assert.deepEqual(await fs.readdir(path.join(f.directory,'cache')),[]);
+});
+
+test('interactive settled models invalidate on headers and malformed configuration without synchronous request builds', async t => {
+  const source='`include ".rtl/defs.inc"\nmodule top; logic [`WIDTH-1:0] value; initial $display(value); endmodule\n';
+  const f=await fixture(t,{source,semanticSessions:true,interactiveEditing:true});
+  await until(()=>f.ready.length>0,async()=>JSON.stringify({status:await f.status(),logs:f.logs}));
+  const query=()=>f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position:{line:1,character:source.split('\n')[1].indexOf('$display(')+9}});
+  assert.ok((await query()).some(item=>item.label==='value'&&/3:0/.test(item.detail)));
+  let count=f.ready.length;
+  const header=path.join(f.project,'.rtl/defs.inc');await fs.writeFile(header,'`define WIDTH 9\n');await f.watch(header);
+  assert.deepEqual(await query(),{isIncomplete:true,items:[]});
+  await until(()=>f.ready.length>count,f.status);
+  assert.ok((await query()).some(item=>item.label==='value'&&/8:0/.test(item.detail)));
+  const manifest=await fs.readFile(f.manifest,'utf8');count=f.ready.length;
+  await fs.writeFile(f.manifest,'invalid !');await f.watch(f.manifest);
+  await until(async()=>(await f.status()).label==='Analysis failed');
+  assert.deepEqual(await query(),{isIncomplete:true,items:[]});assert.equal(f.ready.length,count);
+  await fs.writeFile(f.manifest,manifest);await f.watch(f.manifest);await until(()=>f.ready.length>count,f.status);
+  assert.ok((await query()).some(item=>item.label==='value'));
+});
+
+test('editor sessions reuse compiler queries and replace models after headers, buffers and configuration change', async t => {
+  const source='`include ".rtl/defs.inc"\nmodule top; logic [`WIDTH-1:0] local_signal; initial $display(local_signal); endmodule\n';
+  const f=await fixture(t,{source,semanticSessions:true}); await f.hover();
+  const query=text=>f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position:{line:1,character:text.split('\n')[1].indexOf('$display(')+9}});
+  const before=(await f.starts()).length;
+  for(let i=0;i<4;i++) assert.ok((await query(source)).some(item=>item.label==='local_signal'&&/3:0/.test(item.detail)));
+  assert.equal((await f.starts()).length,before,'unchanged completion must not start another compiler');
+  let [metrics]=await f.connection.sendRequest('rtl/languagePerformance'); assert.equal(metrics.retained,true);assert.equal(metrics.metrics.queries,4);
+  const header=path.join(f.project,'.rtl/defs.inc'); await fs.writeFile(header,'`define WIDTH 8\n'); await f.watch(header);
+  assert.ok((await query(source)).some(item=>item.label==='local_signal'&&/7:0/.test(item.detail)));
+  const edited=source.replaceAll('local_signal','unsaved_signal');
+  await f.connection.sendNotification('textDocument/didChange',{textDocument:{uri:f.uri,version:2},contentChanges:[{text:edited}]});
+  const candidates=await query(edited);assert.ok(candidates.some(item=>item.label==='unsaved_signal'));assert.ok(!candidates.some(item=>item.label==='local_signal'));
+  assert.equal(await fs.readFile(f.file,'utf8'),source);
+  const manifest=await fs.readFile(f.manifest,'utf8');await fs.writeFile(f.manifest,'invalid !');await f.watch(f.manifest);
+  assert.deepEqual(await query(edited),[]);assert.equal((await f.status()).label,'Analysis failed');
+  await fs.writeFile(f.manifest,manifest);await f.watch(f.manifest);assert.ok((await query(edited)).some(item=>item.label==='unsaved_signal'));
+  await f.stop();assert.deepEqual(await fs.readdir(path.join(f.directory,'cache')),[]);
+});
+
+test('session requests retain conservative one-shot behavior without acknowledged dependency watches', async t => {
+  const source='module top; logic local_signal; initial $display(local_signal); endmodule\n';
+  const f=await fixture(t,{source,dynamic:false,semanticSessions:true}); await f.hover();
+  const query=()=>f.connection.sendRequest('textDocument/completion',{textDocument:{uri:f.uri},position:{line:0,character:source.indexOf('$display(')+9}});
+  const before=(await f.starts()).length; await query();await query();assert.equal((await f.starts()).length-before,2);
+  const [metrics]=await f.connection.sendRequest('rtl/languagePerformance');assert.equal(metrics.retained,false);
 });
 test('new dependency watches are acknowledged before publishing and confirmation rereads race-time header writes',async t=>{
   let replaced=false;
@@ -149,7 +354,7 @@ test('ordinary new RTL glob members and deletions still refresh stored semantic 
 });
 test('shared external headers refresh both roots and removed roots release their watches',async t=>{
   const source='`include "defs.inc"\nmodule top(input logic [`WIDTH-1:0] a); endmodule\n';
-  const f=await fixture(t,{source,prepare:({external})=>fs.writeFile(path.join(external,'defs.inc'),'`define WIDTH 4\n')}),second=path.join(f.directory,'second'),secondFile=path.join(second,'code.sv'),secondUri=pathToFileURL(secondFile).href;
+  const f=await fixture(t,{source,semanticSessions:true,prepare:({external})=>fs.writeFile(path.join(external,'defs.inc'),'`define WIDTH 4\n')}),second=path.join(f.directory,'second'),secondFile=path.join(second,'code.sv'),secondUri=pathToFileURL(secondFile).href;
   assert.match(JSON.stringify(await f.hover()),/3:0/);
   await fs.mkdir(second);await fs.writeFile(secondFile,source);await fs.writeFile(path.join(second,'rtl.toml'),'version=1\n[project]\nname="second"\n[sources]\nrtl=["*.sv"]\ninclude_dirs=["../external"]\n');
   const folder={uri:pathToFileURL(second).href,name:'second'};
@@ -159,6 +364,7 @@ test('shared external headers refresh both roots and removed roots release their
   // Opening a second document can supersede an in-flight snapshot in either
   // root; wait for both startup generations rather than treating stale null as failure.
   await until(async()=> (await f.status()).label==='Ready'&&(await f.status(secondUri)).label==='Ready',async()=>JSON.stringify({first:await f.status(),second:await f.status(secondUri),logs:f.logs}));
+  assert.equal((await f.connection.sendRequest('rtl/languagePerformance')).filter(state=>state.retained).length,2);
   for(const result of await Promise.all([f.hover(),secondHover()]))assert.match(JSON.stringify(result),/3:0/);
   const header=path.join(f.external,'defs.inc'),before=(await f.starts()).length;
   await fs.writeFile(header,'`define WIDTH 6\n');await f.watch(header);

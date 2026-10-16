@@ -514,6 +514,7 @@ window.addEventListener('message', event => {
     renderProfile.reset(typeof message.renderProfile === 'string' ? message.renderProfile : undefined);
     metadata = message.metadata; if (!metadata) return;
     traceLink = message.link;
+    if (message.sessionState) saved = message.sessionState;
     receiveViews(message.views); viewId = saved?.viewId;
     const initial = !Array.isArray(saved?.paths) ? viewBook.views.find(v => v.id === viewBook.defaultId) : undefined;
     if (initial) { viewId = initial.id; saved = { paths: initial.signals.map(s => s.path), expanded: initial.signals.filter(s => s.expanded).map(s => s.path), radix: initial.radix, styles: initial.signals.map(s => [s.path, { radix: s.radix, color: s.color }]), viewId }; }

@@ -25,7 +25,7 @@ export function instanceAt(analysis: Analysis, file: string, offset: number): In
   if (first && matches.some(i => i.start.offset === first.start.offset && JSON.stringify(i.ports) !== JSON.stringify(first.ports))) return;
   return first;
 }
-export function portCompletions(analysis: Analysis, file: string, text: string, offset: number): { start: number; end: number; ports: Port[] } {
+export function portCompletions(analysis: Analysis, file: string, text: string, offset: number, filterPrefix = true): { start: number; end: number; ports: Port[] } {
   const scan = scanCode(text.slice(0, offset));
   const match = /\.\s*([A-Za-z_][\w$]*|)$/.exec(scan.code);
   const instance = instanceAt(analysis, file, offset);
@@ -45,7 +45,7 @@ export function portCompletions(analysis: Analysis, file: string, text: string, 
       if (name && instance.start.offset + i !== offset - match[0].length) used.add(name[1]);
     }
   }
-  return { start: offset - match[1].length, end: offset + /^[\w$]*/.exec(text.slice(offset))![0].length, ports: instance.ports.filter(p => !used.has(p.name) && p.name.startsWith(match[1])) };
+  return { start: offset - match[1].length, end: offset + /^[\w$]*/.exec(text.slice(offset))![0].length, ports: instance.ports.filter(p => !used.has(p.name) && (!filterPrefix || p.name.startsWith(match[1]))) };
 }
 export function symbolAt(analysis: Analysis, file: string, text: string, offset: number): { label: string; location: SourcePoint; ports?: Port[] } | undefined {
   const left = scanCode(text.slice(0, offset));

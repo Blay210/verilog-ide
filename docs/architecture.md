@@ -1,3 +1,17 @@
+> 2026-10-16 최신: [편집 의미 표시·추천 연속성](pulse-semantic-continuity.md)을 적용했다. 정밀 최신 모델과 bounded 표시 snapshot을 분리해 module token 위치·검증된 기존 포트·동일 identifier 후보를 유지한다. 진단/hover/이동에는 이전 의미 결과를 쓰지 않는다. 외부/설정/선언 변경은 보수적으로 폐기한다. 전체420 PASS/1 POSIX SKIP·최종 관련40 PASS·language build0. 실제 UI 수용·compiler 부분 증분은 잔여이며 새 화면/설치·배포 없음. 아래 dirty 동안 모든 의미 표시가 비어 있다는 설명은 이전 단계다.
+
+> 2026-10-15 후속: [자동 추천 표시·패키지 namespace 보완](pulse-automatic-completion.md)을 적용했다. 처음 빈 결과 뒤에도 유효한 최근 typing intent로 표시하며 Esc/포커스/이동은 보존한다. snippet 자동 추천과 실제 package 이름/전체 후보 pool도 연결했다. 아래의 visible widget만 갱신하는 설명은 과거 동작이다.
+
+> 2026-10-15 최신: [첫 조회 비용·Simulation UI 지연 구성·독립 로컬 built 실행본](pulse-performance-final.md)을 적용했다. 전체405 PASS/1 POSIX SKIP와 후속8 PASS·공식 bundle/파일/CLI를 확인했다. 기존 Setup은 이전 버전이며 최신 실행은 `ide/Start-Pulse.cmd`다. 실제 새 화면/Windows startup·부분 compiler 증분은 잔여다. 아래의 소스 개발 실행/모든 첫 조회 비용 미보완 설명은 이전 기록이다.
+
+## H7 새 위치 프로젝트 모듈 이름 추천 (2026-10-16)
+
+언어 계층의 bounded ModuleCatalog가 compiler-confirmed root별 정의 이름·종류·원본만 유지한다. 위치별 completion pool/instance 포트·정밀 최신 모델과 구분하며, lexical module-item/generate 위치에만 빠른 이름 후보를 추가한다. 소스 rename/삭제·macro/directive/외부/설정 변경은 보수적으로 폐기하고 정밀 진단/hover/이동에 이전 위치/타입을 넘기지 않는다. [재현·실행·검증·한도](pulse-module-catalog-completion.md)가 최신이다. compiler 부분 증분이나 실제 UI 수용 완료가 아니다.
+
+## H7 최신 편집 분석 구조 (2026-10-15)
+
+독립 IDE의 언어 경로는 입력 예약과 passive 추천 요청을 분리한다. interactive source 편집은 root 수명의 bounded Python/slang worker를 유지하고, 각 model revision마다 이전 native 객체/인덱스를 해제한 뒤 새 compilation을 구성한다. 요청 취소는 wire deadline/슬롯을 남겨 다른 query를 보존하며 root/외부 입력 변경은 실제 cleanup에 합류한다. VS Code API는 얇은 client/host에만 있고 simulation/Core 실행 snapshot은 별도다. [현재 계약·한도·검증·다음 병목](pulse-worker-rebuild.md)이 최신이며 아래의 요청마다 별도 compiler/전체 분석 대기 설명은 이전 단계 기록이다. compiler 내부의 부분 증분·앱 startup·실제 UI 수용은 잔여다.
+
 ## Pulse 브랜드 확정 (2026-10-14 KST)
 
 사용자가 Pulse를 선택했다. 독립 IDE 표시 이름과 별+디지털 파형 벡터/ICO를 반영하고 기존 내부 identity/설정·신뢰 경로는 유지한다. 관련11 PASS·script syntax PASS·PNG 산출물 관찰. 앱 화면/Windows shell 아이콘은 미검증이며 기존 배포 후보는 탭/Pulse 반영 전 버전이다. 다음 승인된 화면 통합→새 후보 build/packaged 수용→ZIP 순서. [결정·파일·검증·인수인계](pulse-branding.md). 아래는 이전 기록이다.

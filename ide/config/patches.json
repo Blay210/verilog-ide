@@ -364,5 +364,23 @@
     "file": "build/gulpfile.vscode.ts",
     "before": "const buildRoot = path.dirname(root);",
     "after": "task.task(task.define('rtl-win32-x64-finish-beta', task.series(patchWin32DependenciesTask('VSCode-win32-x64'))));\n\nconst buildRoot = path.dirname(root);"
+  },
+  {
+    "id": "pulse-waveform-open-imports",
+    "file": "src/vs/workbench/services/editor/browser/editorResolverService.ts",
+    "before": "import { PreferredGroup } from '../common/editorService.js';",
+    "after": "import { PreferredGroup } from '../common/editorService.js';\nimport product from '../../../../platform/product/common/product.js';\nimport { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';"
+  },
+  {
+    "id": "pulse-waveform-open-routing",
+    "file": "src/vs/workbench/services/editor/browser/editorResolverService.ts",
+    "before": "\tasync resolveEditor(editor: IUntypedEditorInput, preferredGroup: PreferredGroup | undefined): Promise<ResolvedEditor> {\n\t\t// Update the flattened editors",
+    "after": "\tasync resolveEditor(editor: IUntypedEditorInput, preferredGroup: PreferredGroup | undefined): Promise<ResolvedEditor> {\n\t\t// Pulse owns waveform tabs in the Simulation space. Explicit Open With, diff,\n\t\t// merge and composite editors retain Code-OSS resolution and source navigation.\n\t\tif (product.applicationName === 'rtl-ide' && !editor.options?.override &&\n\t\t\t!isResourceSideBySideEditorInput(editor) && !isResourceDiffEditorInput(editor) &&\n\t\t\t!isResourceMergeEditorInput(editor) && !isResourceMultiDiffEditorInput(editor) &&\n\t\t\t!isUntitledResourceEditorInput(editor) && CommandsRegistry.getCommand('rtlIde.waveform.openFile')) {\n\t\t\tconst resource = EditorResourceAccessor.getOriginalUri(editor);\n\t\t\tif (resource?.scheme === Schemas.file && /\\.(vcd|fst)$/i.test(resource.path)) {\n\t\t\t\tawait this.instantiationService.invokeFunction(accessor => accessor.get(ICommandService).executeCommand('rtlIde.waveform.openFile', resource));\n\t\t\t\treturn ResolvedStatus.ABORT; // No hidden text tab or unrelated editor is closed.\n\t\t\t}\n\t\t}\n\t\t// Update the flattened editors"
+  },
+  {
+    "id": "rtl-distribution-cli-asset",
+    "file": "build/next/resources.ts",
+    "before": "\t'vs/platform/rtl/node/{waveform-worker.cjs,waveform.html,analyze.py}',",
+    "after": "\t'vs/platform/rtl/node/{waveform-worker.cjs,waveform.html,analyze.py}',\n\t'vs/platform/rtl/node/rtl-cli.cjs',"
   }
 ]

@@ -43,6 +43,24 @@ test('literal arguments, nonzero exit, missing executable and pre-abort remain d
   await assert.rejects(runProcess({ executable: process.execPath, args: [helper, '2'], cwd: root }, { signal: controller.signal }), error => error instanceof ProcessFailure && error.cancelled);
 });
 
+test('interactive owned leaf preserves UTF-8 input and EOF through the common runner', async () => {
+  const value='한글 source #10;';
+  const result=await checkedProcess({executable:process.execPath,args:['-e','process.stdin.setEncoding("utf8");process.stdin.on("data",s=>process.stdout.write(s))'],cwd:root,termination:'process'}, {onStdin:input=>input.end(value)});
+  assert.equal(result,value);
+});
+
+test('failed interactive leaf termination reports cleanup failure and releases its input pipe', { timeout: 15000 }, async () => {
+  const controller=new AbortController(); let pid, writer, entered;
+  const ready=new Promise(resolve=>{entered=resolve;}); let text='';
+  const running=runProcess({executable:process.execPath,args:['-e','process.stdout.write(String(process.pid)+"\\n");process.stdin.resume();setInterval(()=>{},1000)'],cwd:root,termination:'process'},
+    {signal:controller.signal,onStdin:input=>{writer=input;},onLog:chunk=>{text+=chunk;if(text.includes('\n')){pid=Number(text.split('\n')[0]);entered();}}});
+  const outcome=running.then(value=>({value}),error=>({error}));let restore=()=>{};
+  try {
+    await ready;restore=blockTermination(pid);controller.abort();const result=await outcome;
+    assert.equal(result.error?.cleanupFailed,true);assert.equal(result.value,undefined);assert.equal(writer.destroyed,true);
+  } finally {restore();if(pid)await cleanupTree([pid],pid);await outcome;if(pid)await stopped([pid]);}
+});
+
 test('owned leaf cancellation joins actual exit while the process races natural completion', { timeout: 30000 }, async () => {
   for (let i = 0; i < 20; i++) {
     const controller = new AbortController();

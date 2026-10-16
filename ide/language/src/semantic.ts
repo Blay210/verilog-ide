@@ -6,6 +6,7 @@ import { registerLanguageStatus, type LanguageStatus } from './language-status';
 import type { LanguageClient } from 'vscode-languageclient/node';
 import { LatestTask } from './latest-task';
 import { SemanticProcess, LanguageCleanupFailure, deadline } from './semantic-process';
+import { sameCompletion, type CompletionIdentity } from './edit-scheduling';
 
 /** Thin owned adapter. Compiler/provider stays separate from editor and simulator. */
 export function registerSemantic(context: vscode.ExtensionContext): () => Promise<void> {
@@ -14,6 +15,7 @@ export function registerSemantic(context: vscode.ExtensionContext): () => Promis
   let disposed = false;
   let server: SemanticProcess | undefined;
   let ready = false;
+  let lastCompletion: CompletionIdentity | undefined;
   let status: LanguageStatus = { label: 'Starting', detail: 'Checking existing language tools.' };
   const enabled = () => vscode.workspace.isTrusted && vscode.workspace.getConfiguration('rtl').get('editor.semantic', true);
   registerLanguageStatus(context, async uri => {
@@ -33,6 +35,7 @@ export function registerSemantic(context: vscode.ExtensionContext): () => Promis
     log(String(error));
   });
   async function stop(): Promise<void> {
+    lastCompletion = undefined;
     if (!client) return;
     ready = false; status = { label: 'Stopping', detail: 'Waiting for language work and process cleanup.' };
     try {
@@ -72,7 +75,17 @@ export function registerSemantic(context: vscode.ExtensionContext): () => Promis
     }, {
       documentSelector: [{ scheme: 'file', language: 'verilog' }, { scheme: 'file', language: 'systemverilog' }],
       outputChannel: output,
-      initializationOptions: { python, bridge: context.asAbsolutePath('dist/analyze.py'), cache: path.join(home, 'cache/semantic') },
+      initializationOptions: { python, bridge: context.asAbsolutePath('dist/analyze.py'), cache: path.join(home, 'cache/semantic'), semanticSessions: true, interactiveEditing: true },
+      middleware: {
+        provideCompletionItem: async (document, position, completionContext, token, next) => {
+          const request = { uri: document.uri.toString(), version: document.version, line: position.line, character: position.character };
+          lastCompletion = request;
+          try { await vscode.commands.executeCommand('rtlIde.editor.prepareCompletion', request); }
+          catch (error) { log(`Completion intent: ${String(error)}`); }
+          if (token.isCancellationRequested || document.version !== request.version) return;
+          return next(document, position, completionContext, token);
+        }
+      },
       synchronize: { fileEvents: [watcher, journalWatcher] },
       errorHandler: {
         error: error => { failed(new LanguageCleanupFailure(`Language communication failed: ${String(error)}`)); return { action: ErrorAction.Continue, handled: true }; },
@@ -80,6 +93,17 @@ export function registerSemantic(context: vscode.ExtensionContext): () => Promis
       }
     });
     client = selected;
+    selected.onNotification('rtl/analysisReady', (result: { uri: string; version: number }) => {
+      if (disposed || client !== selected || !enabled()) return;
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || !editor.selection.isEmpty) return;
+      const position = editor.selection.active;
+      const current = { uri: editor.document.uri.toString(), version: editor.document.version, line: position.line, character: position.character };
+      if (result.uri !== current.uri || result.version !== current.version || !sameCompletion(lastCompletion, current)) return;
+      // Native intent survives an empty first result, but Escape, movement,
+      // focus loss and a changed document prevent an unsolicited late popup.
+      void vscode.commands.executeCommand('rtlIde.editor.refreshCompletions', current).then(undefined, error => log(`Completion refresh: ${String(error)}`));
+    });
     try { await client.start(); }
     catch (error) { throw new LanguageCleanupFailure(`Language startup cleanup is unconfirmed: ${String(error)}`); }
     if (signal.aborted || disposed || !enabled()) { await stop(); return; }

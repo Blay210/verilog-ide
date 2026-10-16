@@ -9,10 +9,10 @@ export async function runProcess(spec: ProcessSpec, context: OperationContext = 
   if (context.signal?.aborted) throw new ProcessFailure('Cancelled', true);
   return new Promise((resolve, reject) => {
     let output = '', cancelled = false, settled = false;
-    const child = spawn(spec.executable, spec.args, { cwd: spec.cwd, env: spec.env ?? process.env, shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(spec.executable, spec.args, { cwd: spec.cwd, env: spec.env ?? process.env, shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: [context.onStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
     const append = (chunk: string) => { if (settled) return; output = (output + chunk).slice(-65536); context.onLog?.(chunk); };
-    child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
-    child.stdout.on('data', append); child.stderr.on('data', append);
+    child.stdout!.setEncoding('utf8'); child.stderr!.setEncoding('utf8');
+    child.stdout!.on('data', append); child.stderr!.on('data', append);
     let killing: Promise<void> | undefined;
     let killer: ReturnType<typeof spawn> | undefined;
     let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
@@ -21,7 +21,7 @@ export async function runProcess(spec: ProcessSpec, context: OperationContext = 
       settled = true; clearTimeout(cleanupTimer); context.signal?.removeEventListener('abort', abort);
       if (error?.cleanupFailed) {
         // A refused/hung termination must not retain pipes, emit late logs or claim success.
-        child.stdout.destroy(); child.stderr.destroy(); child.unref();
+        child.stdin?.destroy(); child.stdout!.destroy(); child.stderr!.destroy(); child.unref();
         if (killer) { try { killer.kill(); } catch {} killer.unref(); }
       }
       if (error) reject(error); else resolve({ code, output, cancelled });
@@ -59,6 +59,10 @@ export async function runProcess(spec: ProcessSpec, context: OperationContext = 
       else finish(new ProcessFailure(`Could not start ${spec.executable}: ${error.message}`, cancelled));
     });
     child.once('close', code => { void Promise.resolve(killing).then(() => finish(undefined, code)); });
+    if (child.stdin) {
+      child.stdin.on('error', error => { if (!cancelled && !settled) { append(`Input pipe failed: ${error.message}`); abort(); } });
+      try { context.onStdin?.(child.stdin); } catch (error) { append(`Input protocol failed: ${String(error)}`); abort(); }
+    }
   });
 }
 

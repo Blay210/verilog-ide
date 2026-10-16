@@ -3,7 +3,7 @@ let saved: unknown;
 (globalThis as any).acquireVsCodeApi = () => ({
   postMessage: (message: unknown) => parent.postMessage({ rtlWaveform: true, message }, '*'),
   getState: () => saved,
-  setState: (state: unknown) => { saved = state; }
+  setState: (state: unknown) => { saved = state; parent.postMessage({ rtlWaveform: true, message: { kind: 'sessionState', state } }, '*'); }
 });
 window.addEventListener('message', event => {
   if (event.source !== parent || event.data?.kind !== 'window') return;

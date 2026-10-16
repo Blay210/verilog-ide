@@ -11,7 +11,10 @@
   "main": "./dist/extension.cjs",
   "activationEvents": [
     "onLanguage:verilog",
-    "onLanguage:systemverilog"
+    "onLanguage:systemverilog",
+    "onCommand:rtl.setupTools",
+    "onCommand:rtl.setupLanguage",
+    "onCommand:rtl.restartLanguage"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -128,11 +131,63 @@
           "scope": "window",
           "description": "Enable slang module/port/scope intelligence and RTL diagnostics in trusted workspaces."
         },
+        "rtl.waveform.viewer": {
+          "type": "string",
+          "enum": [
+            "internal",
+            "gtkwave"
+          ],
+          "default": "internal",
+          "description": "기본 파형 뷰어. 내장 뷰어는 VCD를 지원하며 FST는 GTKWave로 엽니다."
+        },
         "rtl.toolsDirectory": {
           "type": "string",
           "scope": "window",
           "description": "Shared tool storage outside user projects. Existing tools are verified before reuse."
         }
+      }
+    },
+    "semanticTokenScopes": [
+      {
+        "language": "verilog",
+        "scopes": {
+          "class": [
+            "entity.name.type.module.verilog"
+          ]
+        }
+      },
+      {
+        "language": "systemverilog",
+        "scopes": {
+          "class": [
+            "entity.name.type.module.systemverilog"
+          ]
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "emmet.excludeLanguages": [
+        "markdown",
+        "verilog",
+        "systemverilog"
+      ],
+      "[verilog]": {
+        "editor.colorDecorators": false,
+        "editor.defaultColorDecorators": "never",
+        "editor.wordBasedSuggestions": "off",
+        "editor.quickSuggestionsDelay": 30,
+        "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "off" },
+        "editor.suggestOnTriggerCharacters": true,
+        "editor.suggest.snippetsPreventQuickSuggestions": false
+      },
+      "[systemverilog]": {
+        "editor.colorDecorators": false,
+        "editor.defaultColorDecorators": "never",
+        "editor.wordBasedSuggestions": "off",
+        "editor.quickSuggestionsDelay": 30,
+        "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "off" },
+        "editor.suggestOnTriggerCharacters": true,
+        "editor.suggest.snippetsPreventQuickSuggestions": false
       }
     }
   }

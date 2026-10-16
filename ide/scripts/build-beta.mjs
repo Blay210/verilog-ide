@@ -6,6 +6,7 @@ import { root, inside, inspect, validateSource } from './environment.mjs';
 import { prepareRuntime } from './prepare-runtime.mjs';
 import { prepareLanguage } from './prepare-language.mjs';
 import { prepareBranding, prepareDesktopBranding } from './prepare-branding.mjs';
+import { prepareCliLauncher } from './prepare-cli-launcher.mjs';
 
 // Local, unsigned Windows beta preparation. Never installs or publishes.
 const mode=process.argv.slice(2).join(' ');
@@ -41,6 +42,7 @@ const extensionAnchor="\t\tconst extensions = gulp.src(['.build/extensions/**', 
 const additions=[
  {id:'rtl-distribution-assets',file:'build/next/resources.ts',before:assetAnchor,after:assetAnchor+"\n\t'vs/platform/rtl/node/{waveform-worker.cjs,waveform.html,analyze.py}',"},
  {id:'rtl-distribution-excludes',file:'build/gulpfile.vscode.ts',before:extensionAnchor,after:"\t\tconst rtlExcludes = product.applicationName === 'rtl-ide' ? ['!.build/extensions/copilot/**', '!.build/extensions/github-authentication/**', '!.build/extensions/microsoft-authentication/**'] : [];\n\t\tconst extensions = gulp.src(['.build/extensions/**', ...platformSpecificBuiltInExtensionsExclusions, ...rtlExcludes], { base: '.build', dot: true });"},
+ {id:'rtl-distribution-cli-asset',file:'build/next/resources.ts',before:"\t'vs/platform/rtl/node/{waveform-worker.cjs,waveform.html,analyze.py}',",after:"\t'vs/platform/rtl/node/{waveform-worker.cjs,waveform.html,analyze.py}',\n\t'vs/platform/rtl/node/rtl-cli.cjs',"},
  {id:'rtl-distribution-skip-copilot-shim',file:'build/gulpfile.vscode.ts',before:"\t\tconst builtInCopilotExtensionDir = path.join(appBase, 'extensions', 'copilot');",after:"\t\tif (product.applicationName === 'rtl-ide') { return; }\n\t\tconst builtInCopilotExtensionDir = path.join(appBase, 'extensions', 'copilot');"},
  {id:'rtl-distribution-finish-task',file:'build/gulpfile.vscode.ts',before:'const buildRoot = path.dirname(root);',after:"task.task(task.define('rtl-win32-x64-finish-beta', task.series(patchWin32DependenciesTask('VSCode-win32-x64'))));\n\nconst buildRoot = path.dirname(root);"}
 ];
@@ -104,9 +106,9 @@ try {
   prepareBranding(output,{packaged:true}); prepareDesktopBranding(output,{packaged:true});
   const { refreshPackageIntegrity } = await import('./package-integrity.mjs');
   receipt.integrityFiles = refreshPackageIntegrity(path.join(output,'resources/app'));
-  receipt.passed=true; receipt.codeBackup=stage;
+  prepareCliLauncher(output); receipt.passed=true; receipt.codeBackup=stage;
  } else if(mode==='--finish') {
-  receipt.previous=previousReceipt; await task('rtl-win32-x64-finish-beta'); receipt.passed=true;
+  receipt.previous=previousReceipt; await task('rtl-win32-x64-finish-beta'); prepareCliLauncher(output); receipt.passed=true;
  } else {
  // Reuse the completed official non-native extension preparation from the first
  // build; do not repeat its unused Copilot packaging step. Fail if absent.
@@ -116,7 +118,7 @@ try {
  await task('esbuild-bundle-win32-x64');
  if(fs.existsSync(output)||!inside(fs.realpathSync(root),path.resolve(output)))throw Error('Distribution output appeared or escaped during build; preserve it for review.');
  await task('vscode-win32-x64-ci');
- prepareBranding(output,{packaged:true}); prepareDesktopBranding(output,{packaged:true}); receipt.passed=true;
+ prepareBranding(output,{packaged:true}); prepareDesktopBranding(output,{packaged:true}); prepareCliLauncher(output); receipt.passed=true;
  }
 } catch(error){receipt.error=String(error);throw error;}
 finally {fs.writeFileSync(path.join(reportDir,'beta-receipt.json'),JSON.stringify(receipt,null,2));}

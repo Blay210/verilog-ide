@@ -4,7 +4,7 @@ import { Disposable } from '../../../base/common/lifecycle.js';
 import { onUnexpectedError } from '../../../base/common/errors.js';
 import { IServerChannel } from '../../../base/parts/ipc/common/ipc.js';
 import type { SimulationHost, SimulationState, RoleSelection, ImportSelection, EditorInput, TestListEdit } from '../common/rtlSimulation.js';
-import { createSimulationHost } from './runtime.js';
+import { createSimulationHost, createSourceProject, initializeSourceProject } from './runtime.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { FileAccess } from '../../../base/common/network.js';
@@ -31,7 +31,7 @@ export class RtlSimulationChannel extends Disposable implements IServerChannel {
     if (event !== 'state') { throw Error('Unknown simulation event.'); }
     return this.session(context).events.event as Event<T>;
   }
-  async call<T>(context: string, command: string, arg?: { root?: string; testEdit?: TestListEdit; revision?: string; roles?: RoleSelection; selection?: ImportSelection; names?: string[]; name?: string; approved?: boolean; toolsDirectory?: string; runId?: string; file?: string; token?: string; query?: WaveformQuery; edit?: WaveViewEdit; inputOverrides?: readonly EditorInput[]; recovery?: ImportRecovery; choice?: ImportRecoveryChoice; archive?: ImportArchivePlan }): Promise<T> {
+  async call<T>(context: string, command: string, arg?: { root?: string; parent?: string; options?: { tags?: string[]; jobs?: number }; limit?: number; request?: { token?: string; name?: string; runId?: string; file?: string }; testEdit?: TestListEdit; revision?: string; roles?: RoleSelection; selection?: ImportSelection; names?: string[]; name?: string; approved?: boolean; toolsDirectory?: string; runId?: string; file?: string; token?: string; query?: WaveformQuery; edit?: WaveViewEdit; inputOverrides?: readonly EditorInput[]; recovery?: ImportRecovery; choice?: ImportRecoveryChoice; archive?: ImportArchivePlan }): Promise<T> {
     const session = this.session(context);
     let result: unknown;
     switch (command) {
@@ -47,13 +47,19 @@ export class RtlSimulationChannel extends Disposable implements IServerChannel {
       case 'import-recover':
         if (!arg?.recovery || !['current', 'previous', 'candidate'].includes(arg.choice ?? '')) throw Error('복구할 설정 후보가 필요합니다.');
         result = command === 'import-recover' ? await session.host.recoverImport(arg.recovery, arg.choice!, arg.approved === true) : await session.host.importRecoveryText(arg.recovery, arg.choice!); break;
+      case 'project-create':
+        if (arg?.approved !== true || typeof arg.name !== 'string') throw Error('새 프로젝트 생성 확인이 필요합니다.');
+        if (typeof arg.parent === 'string') return createSourceProject(arg.parent, arg.name) as Promise<T>;
+        if (typeof arg.root === 'string') return initializeSourceProject(arg.root, arg.name) as Promise<T>;
+        throw Error('프로젝트 위치를 선택해 주세요.');
       case 'inspect':
         if (typeof arg?.root !== 'string') { throw Error('Project path required.'); }
         result = await session.host.inspect(arg.root); break;
       case 'start':
         if (arg?.toolsDirectory !== undefined && typeof arg.toolsDirectory !== 'string') { throw Error('Invalid tool storage directory.'); }
         if (arg?.names !== undefined && (!Array.isArray(arg.names) || !arg.names.every(name => typeof name === 'string'))) { throw Error('Invalid test selection.'); }
-        result = session.host.start(arg?.names, arg?.approved === true, arg?.toolsDirectory, arg?.inputOverrides); break;
+        result = session.host.start(arg?.names, arg?.approved === true, arg?.toolsDirectory, arg?.inputOverrides, arg?.options); break;
+      case 'history': result = await session.host.history(arg?.limit); break;
       case 'cancel': result = session.host.cancel(); break;
       case 'classify':
         if (!arg?.roles) { throw Error('Source roles required.'); }
@@ -78,13 +84,20 @@ export class RtlSimulationChannel extends Disposable implements IServerChannel {
         if (typeof arg?.name !== 'string' || typeof arg.runId !== 'string' || typeof arg.file !== 'string') throw Error('Recorded source required.');
         result = await session.host.recordedSource(arg.name, arg.runId, arg.file); break;
       case 'inputs': result = await session.host.refreshInputs(arg?.inputOverrides); break;
+      case 'project-reset': result = await session.host.reset(); break;
       case 'close':
         this.sessions.delete(context);
         try { await session.host.close(); } finally { session.events.dispose(); }
         break;
       case 'wave-open':
         if (typeof arg?.name !== 'string' || typeof arg.runId !== 'string') { throw Error('Recorded run required.'); }
-        result = await session.host.openWaveform(arg.name, arg.runId); break;
+        result = await session.host.openWaveform(arg.name, arg.runId, arg.toolsDirectory); break;
+      case 'wave-file':
+        if (typeof arg?.file !== 'string') throw Error('Waveform file required.');
+        result = await session.host.openWaveformFile(arg.file); break;
+      case 'wave-external':
+        if (!arg?.request || typeof arg.approved !== 'boolean') throw Error('External waveform request required.');
+        await session.host.openExternalWaveform(arg.request, arg.approved, arg.toolsDirectory); break;
       case 'wave-query':
         if (!arg?.query || typeof arg.query.token !== 'string') { throw Error('Waveform query required.'); }
         result = await session.host.queryWaveform(arg.query); break;

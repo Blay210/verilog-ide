@@ -48,7 +48,7 @@ test('IDE service records ordered saved-input runs, history and changed-input st
     assert.equal(project.sources.length, 1);
     return { executable: 'fake', cwd: directory };
   }));
-  const results = await service.run({ root: dir, names: ['second', 'first', 'second'] }, { onResult: result => completed.push(result.name) });
+  const results = await service.run({ root: dir, names: ['second', 'first', 'second'], jobs: 1 }, { onResult: result => completed.push(result.name) });
   assert.deepEqual(seen, ['second', 'first']); assert.deepEqual(completed, seen);
   assert.ok(results.every(r => r.status === 'passed' && r.inputSnapshot.state === 'ready'));
   assert.notEqual(results[0].runId, results[1].runId);
@@ -61,10 +61,22 @@ test('IDE service records ordered saved-input runs, history and changed-input st
   assert.deepEqual((await fs.readdir(dir)).sort(), ['.rtl', 'rtl', 'rtl.toml', 'tb']);
 });
 
+test('explicit parallel jobs permit two isolated builds while returned results preserve selection order', { timeout: 10000 }, async t => {
+  const dir = await fixture(t), directories = new Set(); let active = 0, peak = 0, release;
+  const both = new Promise(resolve => { release = resolve; });
+  const service = new SimulationService(async () => backend(async ({ directory }) => {
+    directories.add(directory); active++; peak = Math.max(peak, active); if (active === 2) release();
+    await both; active--; return { executable: 'fake', cwd: directory };
+  }));
+  const results = await service.run({ root: dir, names: ['second', 'first'], jobs: 2 });
+  assert.equal(peak, 2); assert.equal(directories.size, 2); assert.deepEqual(results.map(result => result.name), ['second', 'first']);
+  assert.ok(results.every(result => result.status === 'passed' && result.inputSnapshot.state === 'ready'));
+});
 test('invalid selection/backend fails before tool lookup or generated files', async t => {
   const dir = await fixture(t); let lookups = 0;
   const service = new SimulationService(async () => { lookups++; throw Error('must not resolve'); });
   for (const names of [[], ['missing']]) await assert.rejects(service.run({ root: dir, names }), e => e.kind === 'project');
+  for (const jobs of [0, 5, 1.5]) await assert.rejects(service.run({ root: dir, jobs }), e => e.kind === 'project');
   const manifest = path.join(dir, 'rtl.toml');
   await fs.writeFile(manifest, (await fs.readFile(manifest, 'utf8')).replace('waveform="none"', 'backend="unsupported"\nwaveform="none"'));
   await assert.rejects(service.run({ root: dir }), e => e.kind === 'project');
@@ -80,7 +92,7 @@ test('active run rejects duplicate requests; cancel completes and allows retry',
     await checkedProcess({ executable: process.execPath, args: ['-e', 'setInterval(()=>{},1000)'], cwd: directory }, context);
     return { executable: 'fake', cwd: directory };
   }));
-  const pending = service.run({ root: dir }); await ready;
+  const pending = service.run({ root: dir, jobs: 1 }); await ready;
   await assert.rejects(service.run({ root: dir }), e => e.kind === 'busy');
   service.cancel();
   const results = await pending;

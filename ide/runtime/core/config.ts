@@ -1,4 +1,5 @@
 import { resolveCatalogTests, catalogOwnsFile } from './test-catalog';
+import { parseImportedExecution } from './execution-document';
 import { readFile, stat, lstat } from 'node:fs/promises';
 import path from 'node:path';
 import { parse } from 'smol-toml';
@@ -127,6 +128,18 @@ export async function loadProject(directory: string, manifestText?: string, sign
   // Proposed import documents are checked as written; live folder discovery is read-only.
   const catalog = manifestText === undefined ? await resolveCatalogTests(root, text, config.test, signal) : undefined;
   if (catalog) config.test = catalog.tests;
+  let managed = false;
+  try { managed = !!parseImportedExecution(root, text); } catch { /* Manually edited documents retain ordinary manifest semantics. */ }
+  if (catalog?.inventory && managed) {
+    // Only untouched managed documents opt in. User manifests keep their
+    // exact source selection; roles supply current sources without disk writes.
+    const common = catalog.inventory.sources.filter(file => file.role === 'source' && file.kind !== 'header');
+    if (common.some(file => file.kind === 'mixed')) throw Error('package와 module이 섞인 파일은 프로젝트 설정에서 명시적으로 구성해 주세요.');
+    config.sources.rtl = common.filter(file => file.kind !== 'package').map(file => ({ file: file.path }));
+    config.sources.packages = common.filter(file => file.kind === 'package').map(file => ({ file: file.path }));
+    config.sources.package_order = 'auto';
+    config.sources.include_dirs = [...new Set([...config.sources.include_dirs, ...catalog.inventory.sources.filter(file => file.kind === 'header').map(file => path.dirname(file.path))])];
+  }
   if (catalog?.inventory) {
     const key = (file: string) => process.platform === 'win32' ? file.toLowerCase() : file;
     const present = new Set(catalog.inventory.sources.map(source => key(source.path)));
@@ -142,7 +155,7 @@ export async function loadProject(directory: string, manifestText?: string, sign
     });
   }
   const includeDirs = config.sources.include_dirs.map(p => path.resolve(root, p));
-  const selection = selectionPaths(root, [...config.sources.packages, ...config.sources.rtl, ...config.test.flatMap(test => test.sources), ...(catalog?.catalog.enabled ? [...catalog.catalog.policy.folders.filter(rule => rule.role === 'simulation').map(rule => ({ file: (rule.path ? rule.path + '/' : '') + '__rtl_watch__.sv' })), ...catalog.catalog.policy.manual.map(file => ({ file }))] : [])], includeDirs);
+  const selection = selectionPaths(root, [...config.sources.packages, ...config.sources.rtl, ...config.test.flatMap(test => test.sources), ...(managed ? [{ file: '__rtl_workspace_watch__.sv' }] : []), ...(catalog?.catalog.enabled ? [...catalog.catalog.policy.folders.filter(rule => rule.role === 'simulation').map(rule => ({ file: (rule.path ? rule.path + '/' : '') + '__rtl_watch__.sv' })), ...catalog.catalog.policy.manual.map(file => ({ file }))] : [])], includeDirs);
   try {
     const names = new Set<string>();
     for (const target of config.test) {

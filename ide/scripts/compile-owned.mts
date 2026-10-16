@@ -7,6 +7,10 @@ import { spawnTsgo } from '../upstream/build/lib/tsgo.ts';
 const compile = createCompile('src', { build: false, emitError: true, transpileOnly: { esbuild: true }, preserveEnglish: false });
 await Promise.all([
   streamToPromise(gulp.src([
+    'src/vs/workbench/browser/media/code-icon.svg',
+    'src/vs/workbench/browser/parts/editor/media/letterpress-*.svg'
+  ], { base: 'src' }).pipe(gulp.dest('out'))),
+  streamToPromise(gulp.src([
     'src/vs/workbench/contrib/rtl/browser/*.ts',
     'src/vs/platform/rtl/common/**/*.ts',
     'src/vs/platform/rtl/node/rtlSimulationChannel.ts',

@@ -17,6 +17,28 @@ test('restart burst uses one fresh probe and start with the latest configuration
   assert.equal(f.stats.probes - baseline, 1); assert.equal(f.stats.starts, 2); assert.equal(f.stats.stops, 1);
   assert.ok(f.clients.at(-1).options.initializationOptions.cache.includes('latest tools'));
 });
+
+test('analysis ready refreshes only the last live completion identity and ignores stale clients and disabled editing', async t => {
+  const f=await lifecycleFixture();cleanup(t,f);await f.restart();
+  const client=f.clients.at(-1),uri='file:///design.sv',position={line:4,character:8};
+  const document={uri:{toString:()=>uri},version:2};
+  const selection={isEmpty:true,active:{...position}};
+  f.api.window.activeTextEditor={document,selection};
+  assert.equal(client.options.initializationOptions.interactiveEditing,true);
+  const notify=client.notifications.get('rtl/analysisReady');
+  notify({uri,version:2});await settle();assert.equal(f.stats.executions.length,0,'no prior completion must not open suggest');
+  assert.deepEqual(await client.options.middleware.provideCompletionItem(document,position,{}, {},()=>[]),[]);
+  notify({uri,version:2});await settle();
+  assert.deepEqual(f.stats.executions,[['rtlIde.editor.prepareCompletion',{uri,version:2,...position}],['rtlIde.editor.refreshCompletions',{uri,version:2,...position}]]);
+  const count=f.stats.executions.length;
+  for(const change of [()=>document.version=3,()=>selection.active.character=9,()=>selection.isEmpty=false,()=>f.api.workspace.isTrusted=false,()=>f.api.workspace.semantic=false]) {
+    document.version=2;selection.active={...position};selection.isEmpty=true;f.api.workspace.isTrusted=true;f.api.workspace.semantic=true;
+    change();notify({uri,version:2});await settle();assert.equal(f.stats.executions.length,count);
+  }
+  f.api.workspace.semantic=true;await f.restart();
+  notify({uri,version:2});await settle();assert.equal(f.stats.executions.length,count,'previous client cannot refresh the new session');
+  await f.close();f.clients.at(-1).notifications.get('rtl/analysisReady')({uri,version:2});await settle();assert.equal(f.stats.executions.length,count);
+});
 test('changes during a probe join cancellation and replace only with the newest probe', async t => {
   const entered = deferred(), gate = deferred(); let signal;
   const f = await lifecycleFixture({ probe: async current => { signal = current; entered.resolve(); await gate.promise; return 'verified'; } }); cleanup(t, f);

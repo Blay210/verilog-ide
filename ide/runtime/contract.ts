@@ -5,7 +5,7 @@ import type { DiscoveryReview, RoleSelection, ImportSelection, ImportPreview, Sa
 export type { DiscoveryReview, RoleSelection, FolderRole, SourceRole, ImportSelection, ImportPreview } from './discovery-model.js';
 export interface SavedWaveViews { book?: ViewBook; revision?: string; label?: string; reason?: string }
 export interface WaveViewEdit { action: 'save' | 'delete' | 'default'; revision: string; id?: string; view?: WaveView }
-export interface WaveformDocument { token: string; runId: string; name: string; metadata: WaveMetadata }
+export interface WaveformDocument { token: string; runId: string; name: string; metadata: WaveMetadata; recorded?: boolean; file?: string }
 export interface WaveformQuery { token: string; kind: 'window' | 'values' | 'edge'; request?: WindowRequest; signal?: string; time?: string; direction?: number }
 export interface EditorInput { path: string; text: string; version?: number }
 export interface RecordedSource { file: string; unsaved: boolean }
@@ -16,15 +16,15 @@ export interface ImportArchivePlan { revision: string; count: number; retained: 
 export interface ImportJournalState { count: number; limit: number; archive?: ImportArchivePlan }
 export interface RunComparison { name: string; runId: string; saved: NonNullable<SimulationResultView['inputs']>; current: NonNullable<SimulationResultView['currentInputs']> }
 export interface SimulationResultView {
-  name: string; top: string; status: 'passed' | 'failed' | 'cancelled' | 'timedOut';
+  name: string; displayName?: string; top: string; status: 'passed' | 'failed' | 'cancelled' | 'timedOut';
   runId?: string; durationMs: number; log: string; source?: string; waveform?: string; message?: string;
   startedAt?: string; inputs?: { state: 'matching' | 'changed' | 'unavailable' | 'legacy'; message: string };
   unsavedFiles?: string[];
   currentInputs?: { state: 'matching' | 'changed' | 'unavailable' | 'legacy'; message: string };
 }
-export type TestListEdit = { action: 'folder'; path: string } | { action: 'file'; path: string } | { action: 'exclude'; file: string; top: string; name?: string } | { action: 'restore'; file: string; top: string; name?: string };
+export type TestListEdit = { action: 'folder'; path: string } | { action: 'file'; path: string } | { action: 'import'; path: string } | { action: 'exclude'; file: string; top: string; name?: string } | { action: 'restore'; file: string; top: string; name?: string } | { action: 'restore-all' };
 export interface SimulationTestView {
-  name: string; top: string; source?: string; latest?: SimulationResultView;
+  name: string; displayName?: string; top: string; source?: string; tags?: string[]; latest?: SimulationResultView;
 }
 export interface SourceSyncState {
   state: 'matching' | 'changed' | 'protected' | 'unavailable';
@@ -48,6 +48,7 @@ export interface SimulationState {
 export interface SimulationHost {
   readonly state: SimulationState;
   inspect(root: string): Promise<SimulationState>;
+  reset(): Promise<SimulationState>;
   editTestList(edit: TestListEdit, revision: string, approved: boolean): Promise<SimulationState>;
   manageProject(approved: boolean): Promise<SimulationState>;
   recoverImport(request: ImportRecovery, choice: ImportRecoveryChoice, approved: boolean): Promise<SimulationState>;
@@ -57,14 +58,17 @@ export interface SimulationHost {
   saveReview(approved: boolean): Promise<SimulationState>;
   prepareReview(selection: ImportSelection, approved: boolean, toolsDirectory?: string): Promise<SimulationState>;
   confirmReview(selection: ImportSelection, approved: boolean, toolsDirectory?: string): Promise<SimulationState>;
-  start(names: string[] | undefined, approved: boolean, toolsDirectory?: string, inputOverrides?: readonly EditorInput[]): SimulationState;
+  start(names: string[] | undefined, approved: boolean, toolsDirectory?: string, inputOverrides?: readonly EditorInput[], options?: { tags?: string[]; jobs?: number }): SimulationState;
+  history(limit?: number): Promise<SimulationResultView[]>;
   cancel(): SimulationState;
   readLog(name: string, runId?: string): Promise<string>;
   recordedSources(name: string, runId: string): Promise<RecordedSource[]>;
   recordedSource(name: string, runId: string, file: string): Promise<RecordedSourceText>;
   compareRun(name: string, runId: string, inputOverrides?: readonly EditorInput[]): Promise<RunComparison>;
   refreshInputs(inputOverrides?: readonly EditorInput[]): Promise<SimulationState>;
-  openWaveform(name: string, runId: string): Promise<WaveformDocument>;
+  openWaveform(name: string, runId: string, toolsDirectory?: string): Promise<WaveformDocument>;
+  openWaveformFile(file: string): Promise<WaveformDocument>;
+  openExternalWaveform(request: { token?: string; name?: string; runId?: string; file?: string }, approved: boolean, toolsDirectory?: string): Promise<void>;
   queryWaveform(query: WaveformQuery): Promise<unknown>;
   closeWaveform(token: string): Promise<void>;
   readWaveViews(token: string): Promise<SavedWaveViews>;

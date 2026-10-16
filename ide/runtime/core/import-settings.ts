@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { RoleSelection } from '../discovery-model';
 import type { DiscoveryReview, ImportSelection, ImportPreview } from '../discovery-model';
 import { prepareImportTargets, type ImportSemanticProvider } from './import-targets';
+import { discoverProject } from './discovery';
 import { loadProject } from './config';
 import { acquireImportLease } from './import-lease';
 import { readImportConfiguration, publishImportConfiguration } from './import-publication';
@@ -94,6 +95,29 @@ export async function confirmImportSettings(review: DiscoveryReview, selection: 
     const text = executionDocument(name, preview, { folders: review.folders, files: review.files });
     await loadProject(review.inventory.root, text);
     return text;
+  }, review.execution ? parseImportedExecution : parseImportSettings);
+  return preview!;
+}
+
+/** Useful before a TB/toolchain exists; explicit creation, no compiler probe. */
+export async function confirmSourceOnlySettings(review: DiscoveryReview, selection: ImportSelection, signal?: AbortSignal): Promise<ImportPreview> {
+  const settings = z.object({ ids: z.array(z.string()).length(0), includeDirs: z.array(z.string().min(1).max(4096)).max(100).default([]), defines: z.record(z.string().max(4096)).default({}) }).strict().parse(selection);
+  if (Object.keys(settings.defines).length > 100 || Object.keys(settings.defines).some(name => !/^[A-Za-z_][A-Za-z0-9_$]*$/.test(name) || ['RTL_WAVEFORM', 'RTL_FST'].includes(name))) throw Error('Invalid or reserved define.');
+  let preview: ImportPreview | undefined;
+  await publish(review.inventory.root, review.manifestRevision, { folders: review.folders, files: review.files }, signal, async name => {
+    const inventory = await discoverProject(review.inventory.root, { folders: review.folders, files: review.files, signal });
+    const common = inventory.sources.filter(file => file.role === 'source' && file.kind !== 'header');
+    if (common.some(file => file.kind === 'mixed')) throw Error('혼합 package/module 파일은 명시적 프로젝트 설정이 필요합니다.');
+    const includeDirs = [...new Set([...inventory.sources.filter(file => file.kind === 'header').map(file => path.dirname(file.path)), ...settings.includeDirs])];
+    for (const directory of includeDirs) {
+      signal?.throwIfAborted();
+      if (path.isAbsolute(directory) || /^[A-Za-z]:/.test(directory) || directory.replaceAll('\\', '/').split('/').includes('..')) throw Error('Include directories must be project-relative.');
+      const absolute = path.resolve(inventory.root, directory), stat = await lstat(absolute), resolved = await realpath(absolute);
+      const relative = path.relative(inventory.root, resolved);
+      if (!stat.isDirectory() || stat.isSymbolicLink() || relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) throw Error('Include directory is missing, linked or outside this project.');
+    }
+    preview = { tests: [], sources: common.filter(file => file.kind !== 'package').map(file => file.path), packages: common.filter(file => file.kind === 'package').map(file => file.path), includeDirs, defines: settings.defines, warnings: [] };
+    return executionDocument(name, preview, { folders: review.folders, files: review.files });
   }, review.execution ? parseImportedExecution : parseImportSettings);
   return preview!;
 }

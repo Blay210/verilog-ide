@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { localSignals } from './local-symbols';
 import { basicCompletions, planBlockEnter, planTemplate, planClosingLabel } from './index';
 
 export function registerEditor(context: vscode.ExtensionContext): void {
@@ -47,7 +48,7 @@ export function registerEditor(context: vscode.ExtensionContext): void {
       if (!vscode.workspace.getConfiguration('rtl', document.uri).get('editor.basicCompletions', true)) return [];
       const offset = document.offsetAt(position);
       const result = basicCompletions(document.getText(), offset, document.languageId as 'verilog' | 'systemverilog');
-      return result.items.map(entry => {
+      const entries = result.items.map(entry => {
         const kind = entry.kind === 'keyword' || entry.kind === 'directive' ? vscode.CompletionItemKind.Keyword : entry.kind === 'primitive' ? vscode.CompletionItemKind.Module : vscode.CompletionItemKind.Function;
         const item = new vscode.CompletionItem(entry.label, kind);
         item.detail = entry.detail;
@@ -62,6 +63,11 @@ export function registerEditor(context: vscode.ExtensionContext): void {
         }
         return item;
       });
+      const prefix = /[A-Za-z_][\w$]*$/.exec(document.getText().slice(0, offset))?.[0];
+      if (prefix && !/[.:]\s*[\w$]*$/.test(document.getText().slice(0, offset))) for (const name of localSignals(document.getText(), offset).filter(name => name.startsWith(prefix))) {
+        const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Variable); item.detail = '현재 문서의 접근 가능한 신호 · lexical'; item.range = new vscode.Range(document.positionAt(offset - prefix.length), position); entries.push(item);
+      }
+      return entries;
     }
   }, '$', '`'));
 

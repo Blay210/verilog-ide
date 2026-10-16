@@ -2,7 +2,7 @@ import path from 'node:path';
 import { realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import type { OperationContext } from './core/index';
-import { detectTools } from './toolchain/detect';
+import { detectTools, managedRoot, exists } from './toolchain/detect';
 import { WindowsMsys2Provider } from './toolchain/install';
 import { verifyToolchain } from './toolchain/verify';
 import { detectSemanticRuntime, installSemanticRuntime, semanticRoot } from './toolchain/semantic';
@@ -48,6 +48,14 @@ export const planTools: ToolPlanner = async (kind, home, context) => {
   const provider = new WindowsMsys2Provider(home);
   const plan = await provider.plan(context);
   return { location: plan.root, components: [...plan.packages], install: async context => { await provider.install(plan, context); } };
+};
+
+/** Explicit update of our managed environment only; never modifies a reused system installation. */
+export const planToolUpdate: ToolPlanner = async (kind, home, context) => {
+  if (kind !== 'simulation') throw Error('현재 관리 도구 업데이트는 시뮬레이션 환경만 지원합니다.');
+  if (!await exists(path.join(managedRoot(home), 'usr', 'bin', 'bash.exe'))) throw Error('이 위치에 관리 도구가 없습니다. 도구 설정으로 먼저 설치해 주세요.');
+  const provider = new WindowsMsys2Provider(home), plan = await provider.plan(context);
+  return { location: plan.root, components: ['관리 MSYS2 패키지 업데이트', ...plan.packages], install: async context => { await provider.install(plan, context); } };
 };
 
 /** Editor-free approval boundary. Installer receives only the internally retained plan. */

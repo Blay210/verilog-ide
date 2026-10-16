@@ -1,8 +1,10 @@
 import { readHistory, compareConfiguredResultInputs, discoverProject, readImportSettings, readImportedExecution, saveImportSettings, prepareImportTargets, confirmImportSettings, readImportRecovery, readImportRecoveryText, resolveImportRecovery, inspectImportJournal, archiveImportJournal } from './core/index';
 import { projectTestCatalog } from './core/config';
-import { readTestCatalog, editTestCatalog, saveTestCatalog, catalogKey } from './core/test-catalog';
+import { readTestCatalog, editTestCatalog, saveTestCatalog, catalogKey, catalogDisplayName } from './core/test-catalog';
 import type { TestListEdit } from './contract';
 import { importProvider } from './import-runtime';
+import { confirmSourceOnlySettings } from './core/import-settings';
+export { createSourceProject, initializeSourceProject } from './core/workspace-project';
 import { compareSourceInventory } from './core/source-sync';
 import type { DiscoveryResult } from './discovery-model';
 import type { SourceSyncState } from './contract';
@@ -25,9 +27,13 @@ import type { ImportRecovery, ImportRecoveryChoice, ImportArchivePlan } from './
 import { loadRecordedInputs } from './core/snapshot';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { detectTools } from './toolchain/detect';
+import { GtkWaveProvider } from './toolchain/viewer';
+import { verifyRecordedTrace } from './core/trace';
+import { mapTraceEnums } from './waveform/enums';
 
 const resultView = (result: TestResult): SimulationResultView => ({
-  name: result.name, top: result.top, status: result.status, runId: result.runId,
+  name: result.name, displayName: result.source ? catalogDisplayName(result.name, path.relative(path.dirname(path.dirname(path.dirname(result.directory))), result.source).replaceAll('\\', '/'), result.top) : result.name, top: result.top, status: result.status, runId: result.runId,
   durationMs: result.durationMs, log: result.log, source: result.source, waveform: result.waveform, message: result.message, startedAt: result.startedAt, unsavedFiles: result.inputSnapshot?.unsavedFiles
 });
 const sameSource = (a: string, b: string) => process.platform === 'win32' ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b);
@@ -54,11 +60,21 @@ export class SimulationHostSession implements SimulationHost {
   private discoveryWork?: Promise<SimulationState>;
   private sourceBaseline?: DiscoveryResult;
   private readonly viewStores = new Map<string, WaveViewStore>();
+  private readonly waveSources = new Map<string, TestResult | string>();
   constructor(private readonly notify: (state: SimulationState) => void, private readonly service = new SimulationService(), private readonly waves = new WaveformHost(), private readonly resolveImport?: (root: string, context: OperationContext, toolsDirectory?: string) => Promise<ImportSemanticProvider>) {}
   private update(change: Partial<SimulationState>): SimulationState {
     this.state = { ...this.state, ...change, revision: this.state.revision + 1 };
     if (!this.closed) this.notify(this.state);
     return this.state;
+  }
+  async reset(): Promise<SimulationState> {
+    if (this.closed || this.pending || this.discoveryWork) throw Error('Simulation host is busy or closed.');
+    this.projectEpoch++; this.comparisonAbort?.abort();
+    for (const controller of this.readControllers) controller.abort();
+    await this.checking?.catch(() => {});
+    await Promise.all([...this.waveSources.keys()].map(token => this.closeWaveform(token)));
+    this.editorInputs = []; this.editorRevision++; this.sourceBaseline = undefined;
+    return this.update({ root: undefined, project: undefined, phase: 'idle', tests: [], history: [], historyOnly: false, activeTest: undefined, log: '', error: undefined, review: undefined, importPreview: undefined, importRecovery: undefined, importJournal: undefined, sourceSync: undefined, savedFolderRoles: undefined, testList: undefined });
   }
   async inspect(root: string): Promise<SimulationState> {
     if (this.closed || this.pending || ['loading', 'running', 'cancelling'].includes(this.state.phase)) throw Error('Simulation host is busy or closed.');
@@ -90,7 +106,7 @@ export class SimulationHostSession implements SimulationHost {
       if (this.closed) throw Error('Simulation host closed while loading.');
       this.update({ phase: 'idle', root: project.root, project: project.name, historyOnly: false, testList: { revision: catalog.revision, folders: catalog.policy.folders.filter(item => item.role === 'simulation').map(item => item.path), manual: catalog.policy.manual, excluded: catalog.policy.excluded }, history: history.map(resultView), tests: project.tests.map(target => {
         const previous = history.find(result => result.name === target.name && result.top === target.top);
-        return { name: target.name, top: target.top, source: target.sources[0], latest: previous && resultView(previous) };
+        return { name: target.name, displayName: catalogDisplayName(target.name, path.relative(project.root, target.sources[0]).replaceAll('\\', '/'), target.top), top: target.top, source: target.sources[0], tags: target.tags ?? [], latest: previous && resultView(previous) };
       }) });
       return await this.refreshInputs();
     } catch (error) {
@@ -214,15 +230,19 @@ export class SimulationHostSession implements SimulationHost {
   private async evaluateReview(selection: ImportSelection, approved: boolean, toolsDirectory: string | undefined, register: boolean): Promise<SimulationState> {
     if (!approved) throw Error('신뢰하지 않는 프로젝트에서는 의미 분석을 실행할 수 없습니다.');
     if (this.closed || this.pending || this.discoveryWork || this.state.phase === 'loading') throw Error('Simulation host is busy or closed.');
-    if (!this.resolveImport || !this.state.review || !this.state.root) throw Error('프로젝트 가져오기 분석을 준비해 주세요.');
+    if (!this.state.review || !this.state.root || (!this.resolveImport && !(register && !selection.ids.length && !this.state.review.execution))) throw Error('프로젝트 가져오기 분석을 준비해 주세요.');
     const review = this.state.review, root = this.state.root;
     const controller = new AbortController(); this.discoveryAbort = controller;
     this.update({ phase: 'loading', importPreview: undefined, error: undefined });
     this.discoveryWork = (async () => {
       try {
         const catalog = register ? await readTestCatalog(root) : undefined;
-        const provider = await this.resolveImport!(root, { signal: controller.signal }, toolsDirectory);
-        const preview = await (register ? confirmImportSettings(review, selection, provider, controller.signal) : prepareImportTargets(review, selection, provider, controller.signal));
+        const preview = register && !selection.ids.length && !review.execution
+          ? await confirmSourceOnlySettings(review, selection, controller.signal)
+          : await (async () => {
+            const provider = await this.resolveImport!(root, { signal: controller.signal }, toolsDirectory);
+            return register ? confirmImportSettings(review, selection, provider, controller.signal) : prepareImportTargets(review, selection, provider, controller.signal);
+          })();
         if (this.closed) return this.state;
         if (register) {
           const selected = new Set(preview.tests.map(test => catalogKey(test.file, test.top)));
@@ -240,7 +260,7 @@ export class SimulationHostSession implements SimulationHost {
           this.sourceBaseline = undefined;
           this.update({ phase: 'idle', importJournal: publication.journal, importRecovery: publication.recoveries, sourceSync: undefined, root: project.root, project: project.name, historyOnly: false, review: undefined, importPreview: undefined, tests: project.tests.map(target => {
             const previous = history.find(result => result.name === target.name && result.top === target.top);
-            return { name: target.name, top: target.top, source: target.sources[0], latest: previous && resultView(previous) };
+            return { name: target.name, displayName: catalogDisplayName(target.name, path.relative(project.root, target.sources[0]).replaceAll('\\', '/'), target.top), top: target.top, source: target.sources[0], tags: target.tags ?? [], latest: previous && resultView(previous) };
           }), history: history.map(resultView) });
           // Initialize a new baseline only after the explicit, validated Apply.
           return await this.refreshInputs();
@@ -275,16 +295,18 @@ export class SimulationHostSession implements SimulationHost {
     })();
     return this.discoveryWork;
   }
-  start(names: string[] | undefined, approved: boolean, toolsDirectory?: string, inputOverrides?: readonly EditorInput[]): SimulationState {
+  start(names: string[] | undefined, approved: boolean, toolsDirectory?: string, inputOverrides?: readonly EditorInput[], options: { tags?: string[]; jobs?: number } = {}): SimulationState {
     if (!approved) throw Error('신뢰하지 않는 프로젝트에서는 시뮬레이션을 실행할 수 없습니다.');
     if (this.closed || this.pending || ['loading', 'running', 'cancelling'].includes(this.state.phase)) throw Error('Simulation host is busy or closed.');
     if (!this.state.root || !this.state.project || this.state.historyOnly) throw Error('먼저 유효한 rtl.toml 프로젝트를 열어 주세요. 보관 이력은 실행 대상으로 등록되지 않습니다.');
     if (names && (!names.length || names.some(name => !this.state.tests.some(test => test.name === name)))) throw Error('실행할 테스트를 선택해 주세요.');
+    if (options.jobs !== undefined && (!Number.isInteger(options.jobs) || options.jobs < 1 || options.jobs > 4)) throw Error('동시 실행 수는 1~4입니다.');
+    if (options.tags && (!Array.isArray(options.tags) || options.tags.length > 100 || options.tags.some(tag => typeof tag !== 'string' || !tag || tag.length > 256))) throw Error('유효한 테스트 태그를 선택해 주세요.');
     const frozen = freezeInputOverrides(inputOverrides);
     this.editorInputs = frozen; this.editorRevision++;
     this.comparisonAbort?.abort();
     this.update({ phase: 'running', log: '', error: undefined, activeTest: undefined });
-    this.pending = this.service.run({ root: this.state.root, names, toolsDirectory, inputOverrides: frozen }, {
+    this.pending = this.service.run({ root: this.state.root, names, toolsDirectory, inputOverrides: frozen, tags: options.tags, jobs: options.jobs }, {
       onStart: target => this.update({ activeTest: target.name }),
       onLog: chunk => this.update({ log: (this.state.log + chunk).slice(-65536) }),
       onResult: result => this.update({ history: [resultView(result), ...(this.state.history ?? []).filter(previous => previous.runId !== result.runId)].slice(0, 100), tests: this.state.tests.map(test => test.name === result.name && test.top === result.top ? { ...test, latest: resultView(result) } : test) })
@@ -366,7 +388,7 @@ export class SimulationHostSession implements SimulationHost {
       }
       if (!controller.signal.aborted && !this.closed && this.state.root === root && this.state.revision === revision && this.editorRevision === editorRevision) return this.update({ sourceSync, savedFolderRoles, ...(!this.state.project && this.state.phase === 'error' ? { phase: 'idle' as const, error: undefined } : {}), project: project.name, historyOnly: false, testList: { revision: catalog.revision, folders: catalog.policy.folders.filter(item => item.role === 'simulation').map(item => item.path), manual: catalog.policy.manual, excluded: catalog.policy.excluded }, tests: project.tests.map(target => {
         const previous = history.find(result => result.name === target.name && result.top === target.top);
-        return { name: target.name, top: target.top, source: target.sources[0], latest: latest.get(target.name) ?? (previous && resultView(previous)) };
+        return { name: target.name, displayName: catalogDisplayName(target.name, path.relative(project.root, target.sources[0]).replaceAll('\\', '/'), target.top), top: target.top, source: target.sources[0], tags: target.tags ?? [], latest: latest.get(target.name) ?? (previous && resultView(previous)) };
       }), history: history.map(resultView) });
       return this.state;
     })().finally(() => { this.checking = undefined; if (this.comparisonAbort === controller) this.comparisonAbort = undefined; });
@@ -374,7 +396,7 @@ export class SimulationHostSession implements SimulationHost {
   }
   async readLog(name: string, runId?: string): Promise<string> {
     return this.readProject(async (root, signal) => {
-      const result = runId ? (await readHistory(root)).find(result => result.name === name && result.runId === runId) : this.state.tests.find(test => test.name === name)?.latest;
+      const result = runId ? (await readHistory(root, 1000)).find(result => result.name === name && result.runId === runId) : this.state.tests.find(test => test.name === name)?.latest;
       const file = result && result.log;
       if (!file) throw Error('이 테스트의 실행 로그가 없습니다.');
       const stat = await lstat(file).catch(error => {
@@ -391,9 +413,12 @@ export class SimulationHostSession implements SimulationHost {
       } finally { await handle.close(); }
     });
   }
-  private readProject<T>(read: (root: string, signal: AbortSignal) => Promise<T>): Promise<T> {
+  history(limit = 1000) {
+    return this.readProject(async (root, signal) => { const results = await readHistory(root, limit); signal.throwIfAborted(); return results.map(resultView); });
+  }
+  private readProject<T>(read: (root: string, signal: AbortSignal) => Promise<T>, allowNoProject = false): Promise<T> {
     const root = this.state.root, epoch = this.projectEpoch;
-    if (this.closed || !root) return Promise.reject(Error('Project is unavailable.'));
+    if (this.closed || (!root && !allowNoProject)) return Promise.reject(Error('Project is unavailable.'));
     const controller = new AbortController();
     this.readControllers.add(controller);
     const check = () => {
@@ -402,7 +427,7 @@ export class SimulationHostSession implements SimulationHost {
       controller.signal.throwIfAborted();
     };
     const work = (async () => {
-      try { const value = await read(root, controller.signal); check(); return value; }
+      try { const value = await read(root ?? '', controller.signal); check(); return value; }
       catch (error) { check(); throw error; }
       finally { this.readControllers.delete(controller); }
     })();
@@ -412,7 +437,7 @@ export class SimulationHostSession implements SimulationHost {
     return work;
   }
   private async sourceContext(root: string, name: string, runId: string, signal: AbortSignal) {
-    const result = (await readHistory(root)).find(run => run.name === name && run.runId === runId);
+    const result = (await readHistory(root, 1000)).find(run => run.name === name && run.runId === runId);
     if (!result) throw Error('Recorded run not found.');
     return await loadRecordedInputs(result, signal);
   }
@@ -450,19 +475,33 @@ export class SimulationHostSession implements SimulationHost {
       return { file, text: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes), unsaved: !!inputs.overrides?.some(input => sameSource(input.path, mapping.original)) };
     });
   }
-  async openWaveform(name: string, runId: string) {
+  async openWaveform(name: string, runId: string, toolsDirectory?: string) {
     let opened: WaveformDocument | undefined;
     try {
       return await this.readProject(async (root, signal) => {
-        if (!this.state.tests.some(test => test.name === name)) throw Error('Unknown waveform test.');
-        const history = await readHistory(root);
+        const history = await readHistory(root, 1000);
         signal.throwIfAborted();
         const result = history.find(result => result.name === name && result.runId === runId);
         if (!result) throw Error('Recorded run not found. Refresh the test list.');
         if (!result.waveform) throw Error('이 실행의 기록된 파형 파일이 없습니다.');
         opened = await this.waves.open(result, signal);
+        if (this.resolveImport) {
+          try {
+            const semanticSignal = AbortSignal.any([signal, AbortSignal.timeout(15000)]);
+            const inputs = await loadRecordedInputs(result, semanticSignal);
+            const provider = await this.resolveImport(root, { signal: semanticSignal }, toolsDirectory);
+            const design = await provider.hierarchy(inputs.project, result.name, [], semanticSignal);
+            await loadRecordedInputs(result, signal);
+            if (design.diagnostics.some(diagnostic => diagnostic.severity === 'error')) throw Error('Recorded enum analysis has errors.');
+            opened.metadata.enumLabels = mapTraceEnums(design, opened.metadata.signals, result.top);
+          } catch (error) {
+            signal.throwIfAborted();
+            opened.metadata.warnings.push(`enum 이름을 연결하지 못했습니다. 숫자로 표시합니다: ${String(error)}`);
+          }
+        }
         signal.throwIfAborted();
         this.viewStores.set(opened.token, new WaveViewStore(root, result.name, result.top));
+        this.waveSources.set(opened.token, result);
         return opened;
       });
     } catch (error) {
@@ -470,18 +509,45 @@ export class SimulationHostSession implements SimulationHost {
       throw error;
     }
   }
+  async openWaveformFile(file: string) {
+    let opened: WaveformDocument | undefined;
+    try {
+      return await this.readProject(async (_root, signal) => {
+        opened = await this.waves.openFile(file, signal);
+        signal.throwIfAborted(); this.waveSources.set(opened.token, path.resolve(file));
+        return opened;
+      }, true);
+    } catch (error) { if (opened) await this.closeWaveform(opened.token); throw error; }
+  }
+  async openExternalWaveform(request: { token?: string; name?: string; runId?: string; file?: string }, approved: boolean, toolsDirectory?: string) {
+    if (!approved) throw Error('외부 뷰어 실행에는 신뢰된 프로젝트 또는 명시적인 파일 열기가 필요합니다.');
+    await this.readProject(async (root, signal) => {
+      let source: TestResult | string | undefined;
+      if (request.token) source = this.waveSources.get(request.token);
+      else if (request.file) source = path.resolve(request.file);
+      else if (request.name && request.runId && root) source = (await readHistory(root, 1000)).find(result => result.name === request.name && result.runId === request.runId);
+      if (!source) throw Error('열려 있는 파형 또는 기록된 실행을 선택해 주세요.');
+      const file = typeof source === 'string' ? source : (await verifyRecordedTrace(source, signal)).file;
+      const tools = await detectTools({ signal }, toolsDirectory);
+      if (!tools.viewer) throw Error('GTKWave가 없습니다. 도구 설정에서 설치하거나 기존 설치 위치를 지정해 주세요.');
+      signal.throwIfAborted(); await new GtkWaveProvider(tools.viewer).open(file, signal);
+    }, true);
+  }
   queryWaveform(query: WaveformQuery) { return this.waves.query(query); }
   private viewStore(token: string) { const store = this.viewStores.get(token); if (this.closed || !store) throw Error('Waveform reader closed.'); return store; }
-  readWaveViews(token: string) { return this.viewStore(token).read(); }
+  readWaveViews(token: string) {
+    if (!this.closed && typeof this.waveSources.get(token) === 'string') return Promise.resolve({ reason: '외부 파일에는 테스트별 저장 보기가 연결되지 않습니다.' });
+    return this.viewStore(token).read();
+  }
   editWaveViews(token: string, edit: WaveViewEdit) { return this.viewStore(token).edit(edit); }
-  closeWaveform(token: string) { this.viewStores.delete(token); return this.waves.close(token); }
+  closeWaveform(token: string) { this.viewStores.delete(token); this.waveSources.delete(token); return this.waves.close(token); }
   async close(): Promise<void> {
     this.closed = true; this.discoveryAbort?.abort(); this.comparisonAbort?.abort();
     for (const controller of this.readControllers) controller.abort();
-    this.viewStores.clear(); this.service.cancel();
+    this.viewStores.clear(); this.waveSources.clear(); this.service.cancel();
     await Promise.all([this.pending, this.checking, this.comparisonQueued, this.discoveryWork, this.waves.dispose(),
       ...Array.from(this.readWork, work => work.catch(() => {}))]);
     if (this.service.cleanupFailure) throw Error(this.service.cleanupFailure);
   }
 }
-export const createSimulationHost = (notify: (state: SimulationState) => void, workerFile?: string, bridge?: string): SimulationHost => new SimulationHostSession(notify, undefined, new WaveformHost(workerFile), bridge ? (root, context, toolsDirectory) => importProvider(root, bridge, context, toolsDirectory) : undefined);
+export const createSimulationHost = (notify: (state: SimulationState) => void, workerFile?: string, bridge?: string): SimulationHost => new SimulationHostSession(notify, new SimulationService(undefined, bridge ? (project, context, toolsDirectory) => importProvider(project.root, bridge, context, toolsDirectory) : undefined), new WaveformHost(workerFile), bridge ? (root, context, toolsDirectory) => importProvider(root, bridge, context, toolsDirectory) : undefined);

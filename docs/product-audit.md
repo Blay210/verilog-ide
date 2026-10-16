@@ -1,3 +1,7 @@
+> 2026-10-14 후속: 사용자가 baseline을 VSIX + α, 제외를 Diagram만으로 지정했다. [VSIX 실제 기능 직접 대조](pulse-vsix-parity-audit.md)가 27개 비Diagram command·설정/키·CLI·진입 연결을 확인한 최신 이식 판정이다. 이전 첫 앱 축소 범위/일반 요구 감사와 구분하며 F5·생성·CLI·parallel/tag·GTKWave 등은 실제 baseline gap으로 관리한다.
+
+> 2026-10-14 독립 앱 상태 재감사: [Pulse 현재 요구·구현 감사](pulse-current-product-audit.md)를 우선 참고한다. 아래 VSIX 기능표/이전 H 단계 상태에는 독립 앱 이전 또는 중간 구현 기록이 포함된다. 새 프로젝트/초기 가져오기 UX·FST/enum 실제 연결·재시작·배포 CLI를 기존 helper/검증 프로젝트 실행 완료로 계산하지 않는다. 이번은 감사/문서 정리이며 기능 수정은 시작하지 않았다.
+
 > 2026-10-05 정리: 현재 구현 상태와 다음 실행 순서는 [제품 전체 로드맵](project-roadmap.md)이 기준이다. 아래 기존 체크포인트/계획은 날짜별 근거로 보존하며, 예전 '다음 작업' 문구는 최신 순서를 대체하지 않는다. 최신 작업은 [PROGRESS](../PROGRESS.md)를 확인한다.
 
 # 초기 요구사항 대비 제품 점검 — 2026-09-30

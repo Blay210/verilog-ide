@@ -8,16 +8,31 @@ import { SlangProvider, moduleHighlights, enumCaseContext, planEnumCase, connect
 import { SemanticWork, SemanticQueueFull } from './semantic-work';
 import { fileKey, contains, actualInput, inputEvent, inputPatterns } from './input-events';
 import { InputWatches } from './input-watches';
+import { moduleSnippet, portSnippet } from './local-symbols';
+import { AnalysisSession } from './analysis-session';
+import { editDelay } from './edit-scheduling';
+import { SemanticContinuity } from './semantic-continuity';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
-interface State { root: string; generation: number; manifestMissing?: boolean; project?: Project; inputProject?: Project; watchPaths?: ProjectWatchPaths; inputs?: AnalysisInputs; abort?: AbortController; timer?: NodeJS.Timeout; pending?: Promise<void>; analysis?: Analysis; published: Set<string>; status?: string; detail?: string }
+interface State { root: string; generation: number; workerAbort?: AbortController; preparing?: Promise<void>; queued?: boolean; edits?: number; starts?: number; obsolete?: number; manifestMissing?: boolean; project?: Project; inputProject?: Project; watchPaths?: ProjectWatchPaths; inputs?: AnalysisInputs; abort?: AbortController; timer?: NodeJS.Timeout; pending?: Promise<void>; analysis?: Analysis; session?: AnalysisSession; retired?: Promise<void>; published: Set<string>; status?: string; detail?: string }
 const states = new Map<string, State>();
+const previews = new Map<State, SemanticContinuity>();
+const preview = (state: State) => { let value = previews.get(state); if (!value) { if (previews.size >= 2) previews.delete(previews.keys().next().value!); value = new SemanticContinuity(); previews.set(state, value); } return value; };
+const documentState = (file: string) => [...states.values()].filter(state => contains(state.root, file)).sort((a, b) => b.root.length - a.root.length)[0];
 const work = new SemanticWork();
 let provider: SlangProvider;
 let stopping = false;
 let dynamicWatches = false;
 let workspaceFoldersSupported = false;
+let tokenRefresh = false;
+let reuseSessions = false;
+let interactiveEditing = false;
+// At most 16 small previous texts for scheduling hints; eviction only loses the
+// fast boundary hint, never document contents or correctness.
+const previousTexts = new Map<string, string>();
+let reservedSessions = 0;
+const sessions = new Set<AnalysisSession>();
 const watches = new InputWatches(async signature => {
   const id = randomUUID(), method = DidChangeWatchedFilesNotification.type.method;
   await connection.sendRequest(RegistrationRequest.type, { registrations: [{ id, method, registerOptions: { watchers: JSON.parse(signature) } }] });
@@ -30,6 +45,7 @@ const syncWatches = () => {
 };
 const ownPatterns = (state: State) => inputPatterns([state], [...states.values()].map(root => root.root));
 const empty: Analysis = { modules: [], instances: [], diagnostics: [] };
+const completionKinds: Record<SemanticSymbol['kind'], CompletionItemKind> = { variable: CompletionItemKind.Variable, constant: CompletionItemKind.Constant, type: CompletionItemKind.Class, function: CompletionItemKind.Function, module: CompletionItemKind.Class, package: CompletionItemKind.Module };
 const isRtl = (file: string) => /\.(?:sv|v|svh|vh)$/i.test(file);
 const tracked = (file: string) => [...states.values()].some(state => actualInput(state, file));
 const overlays = () => documents.all().filter(d => d.uri.startsWith('file:') && (tracked(fileURLToPath(d.uri)) || ['verilog', 'systemverilog'].includes(d.languageId) && isRtl(fileURLToPath(d.uri)))).map(d => ({ file: fileURLToPath(d.uri), text: d.getText() }));
@@ -42,23 +58,85 @@ connection.onInitialize((params: InitializeParams) => {
   const options = params.initializationOptions;
   dynamicWatches = params.capabilities.workspace?.didChangeWatchedFiles?.dynamicRegistration === true && params.capabilities.workspace.didChangeWatchedFiles.relativePatternSupport === true;
   workspaceFoldersSupported = params.capabilities.workspace?.workspaceFolders === true;
+  tokenRefresh = params.capabilities.workspace?.semanticTokens?.refreshSupport === true;
+  reuseSessions = options.semanticSessions === true;
+  interactiveEditing = options.interactiveEditing === true;
   provider = new SlangProvider(options.python, options.bridge, options.cache);
   for (const folder of params.workspaceFolders ?? (params.rootUri ? [{ uri: params.rootUri }] : [])) addRoot(folder.uri);
   return { capabilities: { textDocumentSync: TextDocumentSyncKind.Full, completionProvider: { triggerCharacters: ['.', ':', '('] }, signatureHelpProvider: { triggerCharacters: ['(', ','], retriggerCharacters: [')'] }, codeActionProvider: { codeActionKinds: ['refactor.rewrite'] }, hoverProvider: true, definitionProvider: true, semanticTokensProvider: { legend: { tokenTypes: ['class'], tokenModifiers: ['declaration'] }, full: true }, workspace: { workspaceFolders: { supported: true, changeNotifications: true } } } };
 });
 function clear(state: State) {
+  previews.get(state)?.clear(); previews.delete(state);
+  state.workerAbort?.abort(); state.workerAbort = undefined;
+  for (const uri of state.published) connection.sendDiagnostics({ uri, diagnostics: [] });
+  state.published.clear(); state.analysis = undefined; state.project = undefined;
+  const session = state.session; state.session = undefined;
+  if (session || state.preparing) {
+    const previous = state.retired;
+    const closing = session?.close(true);
+    state.retired = Promise.all([previous, state.preparing, closing]).then(() => { if (session) sessions.delete(session); });
+    void state.retired.catch(error => connection.console.error(`Compiler cleanup: ${String(error)}`));
+  }
+}
+async function analyzeInputs(state: State, project: Project, signal: AbortSignal): Promise<Analysis> {
+  await state.retired; await state.preparing; signal.throwIfAborted();
+  for (const session of sessions) session.assertHealthy();
+  const retainable = reuseSessions && dynamicWatches && project.tests.length <= 4 && project.sources.length <= 2048
+    && project.tests.every(test => project.sources.length + test.sources.length <= 2048);
+  if (interactiveEditing && retainable && state.session?.canRebuild(provider, project)) return state.session.rebuild(provider, project, overlays(), signal);
+  if (state.session) { const previous = state.session; state.session = undefined; await previous.close(true); sessions.delete(previous); }
+  state.workerAbort?.abort(); state.workerAbort = undefined;
+  // Without acknowledged dynamic dependency watches a retained compiler could
+  // outlive external/non-RTL inputs. Keep the conservative one-shot path there.
+  if (!retainable || reservedSessions + [...sessions].filter(s => s.usable).length >= 2) return provider.analyze(project, overlays(), signal);
+  reservedSessions++;
+  const lifetime = interactiveEditing ? new AbortController() : undefined;
+  state.workerAbort = lifetime;
+  const prepared = (async () => {
+    try {
+      const { session, analysis } = await AnalysisSession.open(provider, project, overlays(), signal, { lifetime: lifetime?.signal });
+      if (signal.aborted) { await session.close(true); signal.throwIfAborted(); }
+      sessions.add(session); state.session = session;
+      return analysis;
+    } finally { reservedSessions--; }
+  })();
+  // A cancelled open has no published session yet. Join its real cleanup before
+  // another generation can spawn, preserving cleanupFailed quarantine.
+  const preparing = prepared.then(() => {}, error => { if ((error as { cleanupFailed?: boolean })?.cleanupFailed) throw error; });
+  state.preparing = preparing; void preparing.catch(() => {});
+  try { return await prepared; }
+  finally { if (state.preparing === preparing) state.preparing = undefined; }
+}
+function invalidate(state: State) {
   for (const uri of state.published) connection.sendDiagnostics({ uri, diagnostics: [] });
   state.published.clear(); state.analysis = undefined; state.project = undefined;
 }
-function schedule(state: State) {
+function startQueued(state: State) {
+  if (stopping || ![...states.values()].includes(state) || state.pending || state.timer || !state.queued) return;
+  state.queued = false;
+  state.abort?.abort(); invalidate(state); state.abort = new AbortController();
+  void analyze(state);
+}
+function schedule(state: State, delay = 250, editing = false) {
   if (stopping) return;
   state.status = "Analyzing"; state.detail = "Waiting for current source analysis.";
+  if (interactiveEditing) {
+    state.generation++; state.edits = (state.edits ?? 0) + (editing ? 1 : 0);
+    state.queued = true; clearTimeout(state.timer); invalidate(state);
+    // Retire authoritative results immediately; presentation has its own
+    // bounded, edit-mapped snapshot and never authorizes compiler queries.
+    // Configuration/external events still cancel invalid input work promptly.
+    if (!editing) { state.abort?.abort(); clear(state); }
+    state.timer = setTimeout(() => { state.timer = undefined; startQueued(state); }, delay);
+    return;
+  }
   state.generation++; state.abort?.abort(); state.abort = new AbortController(); clearTimeout(state.timer); clear(state);
   state.timer = setTimeout(() => { state.timer = undefined; void analyze(state); }, 250);
 }
 async function analyze(state: State): Promise<void> {
   const generation = state.generation;
   const abort = state.abort!;
+  state.starts = (state.starts ?? 0) + 1;
   const pending = (async () => {
     try {
       const { project, result } = await work.run(`analysis:${state.root}:${generation}`, abort.signal, async signal => {
@@ -84,7 +162,7 @@ async function analyze(state: State): Promise<void> {
         await syncWatches(); // Register conservative search directories before reading inputs.
         signal.throwIfAborted();
         let before = JSON.stringify(ownPatterns(state));
-        let result = await provider.analyze(project, overlays(), signal);
+        let result = await analyzeInputs(state, project, signal);
         signal.throwIfAborted();
         state.inputs = result.inputs;
         // Watch discovery can expose previously unwatched external/non-RTL paths.
@@ -97,17 +175,22 @@ async function analyze(state: State): Promise<void> {
           // discover new watches for this compilation. Static RTL watches remain.
           if (!patterns.length || current === before) break;
           before = current;
-          result = await provider.analyze(project, overlays(), signal);
+          result = await analyzeInputs(state, project, signal);
           signal.throwIfAborted(); state.inputs = result.inputs;
         }
         signal.throwIfAborted();
         return { project, result };
       });
-      if (generation !== state.generation || abort.signal.aborted) return;
+      if (generation !== state.generation || abort.signal.aborted) { state.obsolete = (state.obsolete ?? 0) + 1; return; }
       state.status = result.diagnostics.some(d => d.severity === "error") ? "Source errors" : "Ready";
       state.detail = "Analysis completed. See Problems for source diagnostics.";
       state.analysis = result;
       state.project = project;
+      if (interactiveEditing) preview(state).modules.publish(result);
+      if (interactiveEditing) for (const document of documents.all()) {
+        if (document.uri.startsWith('file:') && documentState(fileURLToPath(document.uri)) === state)
+          preview(state).publish(document.uri, fileURLToPath(document.uri), document.getText(), result);
+      }
       const grouped = new Map<string, Diagnostic[]>();
       for (const entry of result.diagnostics) {
         if (!entry.location.file || !isRtl(entry.location.file)) continue;
@@ -118,7 +201,19 @@ async function analyze(state: State): Promise<void> {
         grouped.set(uri, list);
       }
       for (const [uri, diagnostics] of grouped) { connection.sendDiagnostics({ uri, diagnostics, version: documents.get(uri)?.version }); state.published.add(uri); }
+      if (interactiveEditing) for (const document of documents.all()) {
+        if (document.uri.startsWith('file:') && contains(state.root, fileURLToPath(document.uri)))
+          connection.sendNotification('rtl/analysisReady', { uri: document.uri, version: document.version, generation });
+      }
+      if (interactiveEditing && tokenRefresh) connection.languages.semanticTokens.refresh();
     } catch (error) {
+      if (abort.signal.aborted || generation !== state.generation) return;
+      previews.get(state)?.clear();
+      if (state.session) {
+        const session = state.session; state.session = undefined;
+        try { await session.close(true); sessions.delete(session); }
+        catch (cleanupError) { error = cleanupError; }
+      }
       if (abort.signal.aborted || generation !== state.generation) return;
       state.manifestMissing = error instanceof ProjectManifestMissing;
       if (state.manifestMissing) {
@@ -143,6 +238,7 @@ async function analyze(state: State): Promise<void> {
   state.pending = pending;
   await pending;
   if (state.pending === pending) state.pending = undefined;
+  if (interactiveEditing) startQueued(state);
 }
 connection.onInitialized(() => {
   for (const state of states.values()) schedule(state);
@@ -153,16 +249,23 @@ connection.onInitialized(() => {
   });
 });
 // Source selection prefixes and actual includes retain shared-root invalidation.
-const changedDocument = (uri: string) => {
+const changedDocument = (uri: string, delay = 250, editing = false) => {
   if (!uri.startsWith('file:')) return;
   const file = fileURLToPath(uri);
-  for (const state of states.values()) if (inputEvent(state, file)) schedule(state);
+  for (const state of states.values()) if (inputEvent(state, file)) schedule(state, delay, editing);
 };
 const documentChanged = (document: TextDocument) => {
-  if (document.uri.startsWith('file:') && (['verilog', 'systemverilog'].includes(document.languageId) || tracked(fileURLToPath(document.uri)))) changedDocument(document.uri);
+  if (document.uri.startsWith('file:') && (['verilog', 'systemverilog'].includes(document.languageId) || tracked(fileURLToPath(document.uri)))) {
+    const text = document.getText(), delay = editDelay(previousTexts.get(document.uri), text);
+    if (interactiveEditing) for (const state of states.values()) if (inputEvent(state, fileURLToPath(document.uri))) previews.get(state)?.edit(document.uri, text, fileURLToPath(document.uri));
+    previousTexts.delete(document.uri);
+    if (text.length <= 1024 * 1024) previousTexts.set(document.uri, text);
+    while (previousTexts.size > 16) previousTexts.delete(previousTexts.keys().next().value!);
+    changedDocument(document.uri, delay, true);
+  }
 };
 documents.onDidChangeContent(event => documentChanged(event.document));
-documents.onDidClose(event => documentChanged(event.document));
+documents.onDidClose(event => { previousTexts.delete(event.document.uri); changedDocument(event.document.uri); });
 connection.onDidChangeWatchedFiles(event => {
   const files = event.changes.filter(change => change.uri.startsWith('file:')).map(change => fileURLToPath(change.uri));
   for (const state of states.values()) if (files.some(file => inputEvent(state, file))) schedule(state);
@@ -175,6 +278,9 @@ async function snapshot(uri: string) {
   const state = [...states.values()].filter(s => contains(s.root, file)).sort((a, b) => b.root.length - a.root.length)[0];
   if (!state) return;
   const generation = state.generation;
+  // Passive editor requests must not flush the debounce or join a full build.
+  // The separate lexical provider can respond while this generation is dirty.
+  if (interactiveEditing && (state.timer || state.pending || state.queued || !state.analysis)) return;
   if (state.timer) { clearTimeout(state.timer); state.timer = undefined; await analyze(state); }
   else if (!state.pending && state.status === 'Analysis busy') await analyze(state);
   else await state.pending;
@@ -182,11 +288,14 @@ async function snapshot(uri: string) {
   return { document, file, analysis: state.analysis ?? empty, state, generation };
 }
 function complete(current: NonNullable<Awaited<ReturnType<typeof snapshot>>>, query: { file: string; offset: number; qualifier?: string }, signal: AbortSignal) {
-  // No settled-result cache: external file changes retain the existing watcher
-  // invalidation contract. Both generation and exact query bind a shared job.
+  // No settled candidate cache: compiler lookup still applies exact scope,
+  // declaration order and parameter context to this immutable generation.
   return work.run(`query:${current.state.root}:${current.generation}:${JSON.stringify(query)}`, signal, async shared => {
     shared.throwIfAborted();
-    return provider.complete(current.state.project!, overlays(), query, shared);
+    for (const active of sessions) active.assertHealthy();
+    const session = current.state.session;
+    session?.assertHealthy();
+    return session?.usable ? session.complete(query, shared) : provider.complete(current.state.project!, overlays(), query, shared);
   });
 }
 connection.onRequest('rtl/languageStatus', (params: { uri: string }) => {
@@ -201,35 +310,66 @@ connection.onRequest('rtl/languageStatus', (params: { uri: string }) => {
   }
   return { label: state.status ?? 'Starting', detail: state.detail ?? 'Waiting for analysis.', root: state.root };
 });
+connection.onRequest('rtl/languagePerformance', () => [...states.values()].map(state => ({ generation: state.generation,
+  retained: state.session?.usable === true, edits: state.edits ?? 0, starts: state.starts ?? 0, obsolete: state.obsolete ?? 0,
+  queued: state.queued === true, metrics: state.session?.metrics })));
 connection.languages.semanticTokens.on(async (params, token) => {
   const current = await snapshot(params.textDocument.uri);
   const builder = new SemanticTokensBuilder();
-  if (!current || token.isCancellationRequested) return builder.build();
-  for (const entry of moduleHighlights(current.analysis, current.file, current.document.getText())) {
-    const position = current.document.positionAt(entry.start);
+  if (token.isCancellationRequested) return builder.build();
+  const document = current?.document ?? documents.get(params.textDocument.uri);
+  if (!document || !document.uri.startsWith('file:')) return builder.build();
+  const state = documentState(fileURLToPath(document.uri));
+  const entries = current ? moduleHighlights(current.analysis, current.file, document.getText()) : state ? previews.get(state)?.tokens(document.uri) ?? [] : [];
+  for (const entry of entries) {
+    const position = document.positionAt(entry.start);
     builder.push(position.line, position.character, entry.length, 0, entry.declaration ? 1 : 0);
   }
   return builder.build();
 });
 connection.onCompletion(async (params, token) => {
-  const current = await snapshot(params.textDocument.uri); if (!current) return [];
+  const current = await snapshot(params.textDocument.uri);
+  if (!current) {
+    if (!interactiveEditing || token.isCancellationRequested) return [];
+    const document = documents.get(params.textDocument.uri);
+    if (!document || !document.uri.startsWith('file:')) return { isIncomplete: true, items: [] };
+    const file = fileURLToPath(document.uri), state = documentState(file), saved = state && previews.get(state);
+    const offset = document.offsetAt(params.position), text = document.getText();
+    const ports = saved?.ports(document.uri, file, offset);
+    if (ports?.ports.length) return { isIncomplete: true, items: ports.ports.map(port => ({ label: port.name, kind: CompletionItemKind.Field,
+      detail: `${port.direction} ${port.type}`, insertTextFormat: 2 as const,
+      textEdit: { range: { start: document.positionAt(ports.start), end: document.positionAt(ports.end) }, newText: portSnippet(port.name, text.slice(ports.end)) } })) };
+    const context = symbolCompletionContext(text, offset), modules = saved?.modules.candidates(text, offset) ?? [];
+    const symbols = [...new Map([...(saved?.candidates(document.uri, offset) ?? []), ...modules].map(symbol => [symbol.name, symbol])).values()];
+    if (!context || !symbols || params.context?.triggerCharacter === '(') return { isIncomplete: true, items: [] };
+    return { isIncomplete: true, items: symbols.map(symbol => {
+      const instantiate = symbol.instantiable === true && !/\b(?:module|interface|program)\s+(?:(?:automatic|static)\s+)?$/.test(text.slice(0, context.start));
+      return { label: symbol.name, kind: completionKinds[symbol.kind], detail: symbol.detail,
+        insertTextFormat: instantiate ? 2 as const : 1 as const, textEdit: { range: { start: document.positionAt(context.start), end: document.positionAt(context.end) }, newText: instantiate ? moduleSnippet(symbol.name) : symbol.name } };
+    }) };
+  }
   const offset = current.document.offsetAt(params.position);
   const targetPort = connectionPort(current.analysis, current.file, current.document.getText(), offset);
   if (params.context?.triggerCharacter === '(' && !targetPort) return [];
-  const result = portCompletions(current.analysis, current.file, current.document.getText(), offset);
-  if (result.ports.length) return result.ports.map(port => ({ label: port.name, kind: CompletionItemKind.Field, detail: `${port.direction} ${port.type}`, textEdit: { range: { start: current.document.positionAt(result.start), end: current.document.positionAt(result.end) }, newText: port.name } }));
+  const result = portCompletions(current.analysis, current.file, current.document.getText(), offset, false);
+  if (result.ports.length) return result.ports.map(port => ({ label: port.name, kind: CompletionItemKind.Field, detail: `${port.direction} ${port.type}`, insertTextFormat: 2 as const, textEdit: { range: { start: current.document.positionAt(result.start), end: current.document.positionAt(result.end) }, newText: portSnippet(port.name, current.document.getText().slice(result.end)) } }));
   const context = symbolCompletionContext(current.document.getText(), offset);
   if (!context || !current.state.project || token.isCancellationRequested) return [];
   const abort = new AbortController();
   const subscription = token.onCancellationRequested(() => abort.abort());
   const signal = current.state.abort ? AbortSignal.any([abort.signal, current.state.abort.signal]) : abort.signal;
   try {
-    const symbols = await complete(current, { file: current.file, offset, qualifier: context.qualifier }, signal);
+    const queried = await complete(current, { file: current.file, offset, qualifier: context.qualifier }, signal);
     if (signal.aborted || current.generation !== current.state.generation) return [];
-    const kinds: Record<SemanticSymbol['kind'], CompletionItemKind> = { variable: CompletionItemKind.Variable, constant: CompletionItemKind.Constant, type: CompletionItemKind.Class, function: CompletionItemKind.Function, module: CompletionItemKind.Module, package: CompletionItemKind.Module };
-    return symbols.filter(s => s.name.startsWith(context.prefix) && (!targetPort || s.kind !== 'module')).map(symbol => {
+    const modules = !targetPort && interactiveEditing ? previews.get(current.state)?.modules.candidates(current.document.getText(), offset) ?? [] : [];
+    const symbols = [...new Map([...queried, ...modules].map(symbol => [symbol.name, symbol])).values()];
+    if (interactiveEditing && !targetPort) preview(current.state).remember(current.document.uri, current.document.getText(), offset, symbols);
+    // Give the editor the whole valid scope. It filters locally while typing,
+    // without a fresh compiler round trip for each additional prefix letter.
+    return symbols.filter(s => !targetPort || s.kind !== 'module').map(symbol => {
       const rank = connectionRank(targetPort, symbol);
-      return { label: symbol.name, kind: kinds[symbol.kind], detail: symbol.detail + (rank.reason ? ` · ${rank.reason}` : ''), sortText: targetPort ? rank.sortText : '0_' + symbol.name, textEdit: { range: { start: current.document.positionAt(context.start), end: current.document.positionAt(context.end) }, newText: symbol.name } };
+      const instantiate = symbol.instantiable === true && !/\b(?:module|interface|program)\s+(?:(?:automatic|static)\s+)?$/.test(current.document.getText().slice(0, context.start));
+      return { label: symbol.name, kind: completionKinds[symbol.kind], detail: symbol.detail + (rank.reason ? ` · ${rank.reason}` : ''), sortText: targetPort ? rank.sortText : '0_' + symbol.name, insertTextFormat: instantiate ? 2 as const : 1 as const, textEdit: { range: { start: current.document.positionAt(context.start), end: current.document.positionAt(context.end) }, newText: instantiate ? moduleSnippet(symbol.name) : symbol.name } };
     });
   } catch (error) {
     if (!signal.aborted) connection.console.error(`Completion: ${String(error)}`);
@@ -299,7 +439,7 @@ connection.onDefinition(async params => {
 async function drain(): Promise<void> {
   stopping = true;
   for (const state of states.values()) { state.abort?.abort(); clearTimeout(state.timer); }
-  const closed = await Promise.allSettled([work.close(), watches.close()]);
+  const closed = await Promise.allSettled([work.close(), watches.close(), ...[...sessions].map(session => session.close(true)), ...[...states.values()].map(state => state.retired)]);
   for (const result of closed) if (result.status === 'rejected') throw result.reason;
 }
 connection.onRequest('rtl/prepareShutdown', async () => { await drain(); return { ready: true }; });

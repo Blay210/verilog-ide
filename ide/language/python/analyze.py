@@ -233,67 +233,113 @@ def hierarchy(root, manager, point):
     return [node(instance, top=True) for instance in root.topInstances]
 
 
-def complete(compilation, defaults, query, manager, point, source_files):
+def complete(compilation, defaults, query, manager, point, source_files, index=None):
     """Enumerate candidates, but let slang perform visibility/import/name resolution."""
-    paths = {}
+    index = {} if index is None else index
+    paths = index.setdefault('paths', {})
     def canonical(file):
-        if file in paths:
-            return paths[file]
+        key = os.path.normcase(os.path.normpath(file))
+        if key in paths:
+            return paths[key]
         value = os.path.normcase(os.path.realpath(file))
         if len(paths) < 4096:
-            paths[file] = value
+            paths[key] = value
         return value
-    filename = canonical(query['file'])
+    # A caller can retarget an unlisted path alias without changing compiler
+    # inputs. Resolve the query spelling afresh; only compiler identities cache.
+    filename = os.path.normcase(os.path.realpath(query['file']))
     offset = query['offset']
     # Overlays include other open tabs too. Only compiled sources and headers that
     # were actually included belong to this compilation's visibility context.
-    known_files = {canonical(file) for file in source_files}
-    known_files.update(canonical(str(manager.getFullPath(buffer))) for buffer in manager.getAllBuffers() if manager.getIncludedFrom(buffer))
+    if 'known_files' not in index:
+        known_files = {canonical(file) for file in source_files}
+        known_files.update(canonical(str(manager.getFullPath(buffer))) for buffer in manager.getAllBuffers() if manager.getIncludedFrom(buffer))
+        index['known_files'] = known_files
+    known_files = index['known_files']
     if filename not in known_files:
         return []
     qualifier = query.get('qualifier')
-    names = set()
-    scopes = []
     allowed = {'InstanceBody', 'Package', 'Subroutine', 'StatementBlock', 'GenerateBlock', 'CompilationUnit'}
 
     def in_file(location):
         return location['file'] and canonical(location['file']) == filename
 
-    def collect(symbol):
-        if not isinstance(symbol, slang.ast.Symbol):
-            return
-        if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_$]*', symbol.name):
-            names.add(symbol.name)
-        if isinstance(symbol, slang.ast.Scope) and symbol.syntax is not None:
-            start = point(symbol.syntax.sourceRange.start)
-            if not in_file(start):
-                return  # Names still contribute; this range cannot contain the caret.
-            end = point(symbol.syntax.sourceRange.end)
-            if in_file(end) and start['offset'] <= offset <= end['offset']:
-                scopes.append((end['offset'] - start['offset'], symbol))
-
-    compilation.getRoot().visit(collect)
+    def inventory(model, key):
+        if key not in index:
+            found_names, found_scopes = set(), []
+            buffer_files = {}
+            def original_file(location):
+                location = manager.getFullyOriginalLoc(location)
+                if location.buffer not in buffer_files:
+                    buffer_files[location.buffer] = canonical(str(manager.getFullPath(location.buffer)))
+                return location, buffer_files[location.buffer]
+            def collect(symbol):
+                if not isinstance(symbol, slang.ast.Symbol):
+                    return
+                # Definition names are appended separately. Root instances and
+                # instance bodies do not introduce local completion variables.
+                if not isinstance(symbol, slang.ast.InstanceBodySymbol):
+                    top_instance = isinstance(symbol, slang.ast.InstanceSymbol) and symbol.parentScope.containingInstance is None
+                    if not top_instance and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_$]*', symbol.name):
+                        found_names.add(symbol.name)
+                if isinstance(symbol, slang.ast.Scope):
+                    syntax = symbol.syntax
+                    if syntax is not None:
+                        source_range = syntax.sourceRange
+                        start, start_file = original_file(source_range.start)
+                        end, end_file = original_file(source_range.end)
+                        if start_file == end_file:
+                            found_scopes.append((start_file, start, end, symbol))
+            model.getRoot().visit(collect)
+            index[key] = (found_names, found_scopes)
+        return index[key]
+    def containing(ranges):
+        # Only map source coordinates for scopes in the requested file. Other
+        # buffers keep native immutable locations until they are actually used.
+        result = []
+        for file, start, end, symbol in ranges:
+            if file != filename:
+                continue
+            first, last = point(start)['offset'], point(end)['offset']
+            if first <= offset <= last:
+                result.append((last - first, symbol))
+        return result
+    primary_names, primary_ranges = inventory(compilation, 'primary')
+    names, scopes = set(primary_names), containing(primary_ranges)
     if not any(str(scope.kind).split('.')[-1] != 'CompilationUnit' for _, scope in scopes):
         # Uninstantiated modules still need editing support, using their defaults.
-        defaults.getRoot().visit(collect)
+        default_names, default_ranges = inventory(defaults, 'defaults')
+        names.update(default_names)
+        scopes.extend(containing(default_ranges))
     # fromBuffers creates one compilation unit whose syntax can span several files.
     # Its start/end cannot serve as a same-file range, but file-level imports and
     # declarations must still be available when the caret is outside a module.
     if not scopes:
         scopes.extend((float('inf'), unit) for unit in compilation.getCompilationUnits())
-    for package in compilation.getPackages():
-        if package.name != 'std':
-            package.visit(lambda symbol: names.add(symbol.name) if isinstance(symbol, slang.ast.Symbol) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_$]*', symbol.name) else None)
-            names.add(package.name)
+    if 'package_names' not in index:
+        package_names = set()
+        for package in compilation.getPackages():
+            if package.name != 'std':
+                package.visit(lambda symbol: package_names.add(symbol.name) if isinstance(symbol, slang.ast.Symbol) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_$]*', symbol.name) else None)
+                package_names.add(package.name)
+        index['package_names'] = package_names
+    names.update(index['package_names'])
     if qualifier and (not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_$]*', qualifier) or compilation.getPackage(qualifier) is None):
         return []
     if not scopes:
         return []
     if any(str(scope.kind).split('.')[-1] == 'ClassType' for _, scope in scopes):
         return []
+    # A single module without trailing newline can have the same source range
+    # as its compilation unit. The unit is still outer, not another elaboration
+    # whose visible symbols should intersect the module-local candidates.
+    local_scopes = [(size, scope) for size, scope in scopes if str(scope.kind).split('.')[-1] != 'CompilationUnit']
+    if local_scopes:
+        scopes = local_scopes
     smallest = min(size for size, _ in scopes)
     innermost = [scope for size, scope in scopes if size == smallest]
-    results = []
+    contexts = []
+    boundaries = []
     for scope in innermost:
         kind = str(scope.kind).split('.')[-1]
         # A class or other unsupported nested scope must not leak its outer scope.
@@ -310,10 +356,22 @@ def complete(compilation, defaults, query, manager, point, source_files):
             if in_file(location) and location['offset'] >= offset:
                 following.append((location['offset'], member))
         if following:
-            lookup_location = slang.ast.LookupLocation.before(min(following, key=lambda entry: entry[0])[1])
+            next_offset, next_member = min(following, key=lambda entry: entry[0])
+            lookup_location = slang.ast.LookupLocation.before(next_member)
+            boundary = (next_offset, next_member.name)
+        else:
+            boundary = None
+        contexts.append((scope, lookup_location))
+        boundaries.append((id(scope), boundary))
+    cache_key = (filename, qualifier, tuple(boundaries))
+    resolved = index.setdefault('resolved', {})
+    if cache_key in resolved:
+        return resolved[cache_key][0]
+    results = []
+    for scope, lookup_location in contexts:
         found = {}
-        # Spellings depend on this exact scope and declaration-order location.
-        # Never reuse them across parameterizations, tests, scopes or requests.
+        # Reuse is restricted to this immutable compiler generation and exact
+        # scope/parameterization/declaration boundary/qualifier, never by prefix.
         enum_values = ScopeEnumValues()
         for name in sorted(names):
             symbol = scope.lookupName((qualifier + '::' if qualifier else '') + name, lookup_location, slang.ast.LookupFlags.NoUndeclaredError)
@@ -367,10 +425,28 @@ def complete(compilation, defaults, query, manager, point, source_files):
             if canonical(location['file']) in known_files:
                 definitions.setdefault(definition.name, []).append((definition, location))
         visible_names = {entry['name'] for entry in visible}
+        # Packages are a project namespace, not ordinary module-local symbols.
+        # lookupName('pkg') need not resolve an unimported package even though
+        # pkg::member is legal. Enumerate real compiled packages explicitly.
+        for package in compilation.getPackages():
+            if package.name == 'std' or package.name in visible_names:
+                continue
+            entry = describe_symbol(package, point)
+            if entry is not None and canonical(entry['location']['file']) in known_files:
+                visible.append(entry)
+                visible_names.add(package.name)
         for name, entries in sorted(definitions.items()):
             if len(entries) == 1 and name not in visible_names:
                 definition, location = entries[0]
-                visible.append({'name': name, 'kind': 'module', 'detail': definition.getKindString() + ' ' + name, 'location': location})
+                visible.append({'name': name, 'kind': 'module', 'instantiable': True, 'detail': definition.getKindString() + ' ' + name, 'location': location})
+    cost = len(json.dumps(visible, ensure_ascii=False).encode('utf-8'))
+    budget = 8 * 1024 * 1024
+    if cost <= budget:
+        while resolved and (len(resolved) >= 128 or index.get('resolved_bytes', 0) + cost > budget):
+            _, old_cost = resolved.pop(next(iter(resolved)))
+            index['resolved_bytes'] -= old_cost
+        resolved[cache_key] = (visible, cost)
+        index['resolved_bytes'] = index.get('resolved_bytes', 0) + cost
     return visible
 
 
@@ -423,7 +499,7 @@ def describe_symbol(symbol, point):
     return result
 
 
-def analyze(request):
+def analyze(request, retained=None):
     if os.name == 'nt':
         # Native std::filesystem string conversion must use UTF-8, not the system ACP.
         locale.setlocale(locale.LC_ALL, '.UTF8')
@@ -538,7 +614,10 @@ def analyze(request):
     # synthetic and must never become filesystem watch paths.
     files = {os.path.abspath(file) for file in request['sources']}
     files.update(str(manager.getFullPath(buffer)) for buffer in manager.getAllBuffers() if manager.getIncludedFrom(buffer))
-    files.update(os.path.realpath(file) for file in list(files))
+    # Capture compiler-input identity once for this immutable model. Previously
+    # the same paths were resolved again for tracking and the first query.
+    identities = {file: os.path.realpath(file) for file in files}
+    files.update(identities.values())
     # IncludeMetadata contains the expanded name (including macro includes).
     # Missing paths come from compiler diagnostic arguments, never parsed prose.
     # Other errors retain conservative directory watches too.
@@ -559,14 +638,39 @@ def analyze(request):
     for diagnostic in tree.diagnostics:
         if str(diagnostic.code) == 'DiagCode(CouldNotOpenIncludeFile)' and diagnostic.args:
             candidates.update(include_candidates(str(diagnostic.args[0]), diagnostic.location))
-    canonical_files = {os.path.normcase(os.path.realpath(file)) for file in files}
+    canonical_files = {os.path.normcase(file) for file in identities.values()}
     files.update(file for file in candidates if os.path.lexists(file) and os.path.normcase(os.path.realpath(file)) in canonical_files)
     result = {'modules': modules, 'instances': instances, 'diagnostics': diagnostics,
               'inputs': {'files': sorted(files), 'candidates': sorted(candidates),
                          'conservative': any(d['severity'] == 'error' for d in diagnostics)}}
+    paths = {}
+    for file, real in identities.items():
+        for name in (file, real):
+            if len(paths) < 4096:
+                paths[os.path.normcase(os.path.normpath(name))] = os.path.normcase(real)
+    completion_index = {'paths': paths, 'known_files': canonical_files}
     if request.get('query'):
-        result['completions'] = complete(compilation, defaults, request['query'], manager, point, request['sources'])
+        result['completions'] = complete(compilation, defaults, request['query'], manager, point, request['sources'], completion_index)
+    if retained is not None:
+        # Keep string_views, source manager and both elaborations alive together.
+        # These are immutable input generations, not an incremental compiler API.
+        retained.append({'compilation': compilation, 'defaults': defaults, 'manager': manager,
+                         'point': point, 'sources': request['sources'], 'index': completion_index, 'keepalive': (tree, predefines, buffers, request)})
     return result
+
+
+def read_package_approval(file, timeout=15):
+    # Atomic publication prevents partial JSON, but Windows readers can still
+    # encounter a transient sharing denial around a newly renamed file.
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            with open(file, encoding='utf-8') as source:
+                return json.load(source)
+        except (FileNotFoundError, PermissionError) as error:
+            if time.monotonic() >= deadline:
+                raise TimeoutError('Semantic package approval did not arrive or was not readable') from error
+            time.sleep(0.01)
 
 
 def run_request(request):
@@ -584,13 +688,7 @@ def run_request(request):
         sys.stdout.flush()
         del graph
         # Bound an abandoned approval wait even if the owning Node process dies.
-        deadline = time.monotonic() + 15
-        while not os.path.exists(channel['continue']):
-            if time.monotonic() >= deadline:
-                raise TimeoutError('Semantic package approval did not arrive')
-            time.sleep(0.01)
-        with open(channel['continue'], encoding='utf-8') as source:
-            continuation = json.load(source)
+        continuation = read_package_approval(channel['continue'])
         if continuation.get('protocol') != 1 or not isinstance(continuation.get('approval'), str) or continuation['request'].get('operation') not in (
                 None, 'batch', 'hierarchy', 'internalOperations', 'scopeOperations'):
             raise ValueError('Invalid semantic package continuation')
@@ -606,9 +704,121 @@ def run_request(request):
     return analyze(request)
 
 
+def resident_bytes():
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+        class Counters(ctypes.Structure):
+            _fields_ = [('cb', wintypes.DWORD), ('faults', wintypes.DWORD)] + [
+                (name, ctypes.c_size_t) for name in ('peak', 'working', 'peakPaged', 'paged', 'peakNonpaged', 'nonpaged', 'pagefile', 'peakPagefile')]
+        counters = Counters()
+        counters.cb = ctypes.sizeof(counters)
+        current = ctypes.windll.kernel32.GetCurrentProcess
+        current.restype = wintypes.HANDLE
+        measure = ctypes.windll.psapi.GetProcessMemoryInfo
+        measure.argtypes = [wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD]
+        if not measure(current(), ctypes.byref(counters), counters.cb):
+            raise OSError('Compiler resident memory measurement failed')
+        return counters.working
+    import resource
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak if sys.platform == 'darwin' else peak * 1024
+
+
+def editor_session(request):
+    """One worker; fresh compiler models per revision, no finalized AST mutation."""
+    # Windows redirected stdin otherwise follows the active ANSI code page.
+    # Node writes UTF-8, including Korean/spaced project and source paths.
+    sys.stdin.reconfigure(encoding='utf-8')
+    def emit(message):
+        sys.stdout.write('\x1eRTL_EDITOR_V1 ' + json.dumps(message, ensure_ascii=True) + '\n')
+        sys.stdout.flush()
+    directory = os.path.dirname(os.path.realpath(sys.argv[1]))
+    retained, groups = [], []
+    revision = 0
+
+    def build_model(value, command_id):
+        nonlocal groups
+        groups = value['groups']
+        if not 1 <= len(groups) <= 4 or any(len(group['sources']) > 2048 for group in groups):
+            raise ValueError('Editor session group/source limit exceeded')
+        results = [analyze({**value, **group, 'operation': None}, retained) for group in groups]
+        source_bytes = sum(sum(len(entry['manager'].getSourceText(buffer).encode('utf-8'))
+                               for buffer in entry['manager'].getAllBuffers()) for entry in retained)
+        rss = resident_bytes()
+        reusable = source_bytes <= 32 * 1024 * 1024 and rss <= 512 * 1024 * 1024
+        emit({'kind': 'ready', 'id': command_id, 'revision': revision, 'analyses': results,
+              'reusable': reusable, 'sourceBytes': source_bytes, 'rssBytes': rss})
+        return reusable
+
+    def lookup(query):
+        # Keep per-query native references local so rebuild can collect the old
+        # model and all its scope/enum/source indexes before preparing another.
+        canonical = lambda file: os.path.normcase(os.path.realpath(file))
+        matching = [i for i, group in enumerate(groups) if canonical(query['file']) in {canonical(f) for f in group.get('testSources', [])}]
+        agreed = None
+        for i in matching or range(len(retained)):
+            entry = retained[i]
+            symbols = complete(entry['compilation'], entry['defaults'], query, entry['manager'], entry['point'], entry['sources'], entry['index'])
+            if agreed is None:
+                agreed = symbols
+            else:
+                identities = {json.dumps(symbol, sort_keys=True) for symbol in symbols}
+                agreed = [symbol for symbol in agreed if json.dumps(symbol, sort_keys=True) in identities]
+        return agreed or []
+
+    if not build_model(request, 0):
+        return
+    request = None
+    while True:
+        line = sys.stdin.readline(16385)
+        if not line:
+            return
+        if len(line) > 16384 or not line.endswith('\n'):
+            raise ValueError('Editor query limit exceeded')
+        command = json.loads(line)
+        if command.get('kind') == 'close':
+            return
+        if not isinstance(command.get('id'), int) or command['id'] <= 0:
+            raise ValueError('Invalid editor query')
+        if command.get('kind') == 'rebuild':
+            if command.get('revision') != revision + 1 or revision >= 64:
+                raise ValueError('Invalid editor revision')
+            name = 'model-' + str(command['id']) + '.json'
+            filename = os.path.join(directory, name)
+            if command.get('input') != name or os.path.realpath(filename) != filename:
+                raise ValueError('Invalid editor model input')
+            # No native objects or user macro state cross a model generation.
+            retained.clear()
+            groups = []
+            import gc
+            gc.collect()
+            with open(filename, encoding='utf-8') as source:
+                request = json.load(source)
+            revision += 1
+            if not build_model(request, command['id']):
+                return
+            request = None
+            continue
+        if command.get('kind') != 'complete' or command.get('revision') != revision:
+            raise ValueError('Invalid editor query revision')
+        query = command['query']
+        if not isinstance(query.get('file'), str) or not isinstance(query.get('offset'), int) or query['offset'] < 0:
+            raise ValueError('Invalid editor position')
+        symbols = lookup(query)
+        rss = resident_bytes()
+        emit({'kind': 'complete', 'id': command['id'], 'revision': revision, 'symbols': symbols, 'rssBytes': rss})
+        symbols = None
+        if rss > 512 * 1024 * 1024:
+            return  # Release a context that grew during lazy compiler lookups.
+
+
 if __name__ == '__main__':
     with open(sys.argv[1], encoding='utf-8') as source:
         request = json.load(source)
-    result = run_request(request)
-    with open(sys.argv[2], 'w', encoding='utf-8') as destination:
-        json.dump(result, destination, ensure_ascii=False)
+    if request.get('operation') == 'editor-session':
+        editor_session(request)
+    else:
+        result = run_request(request)
+        with open(sys.argv[2], 'w', encoding='utf-8') as destination:
+            json.dump(result, destination, ensure_ascii=False)

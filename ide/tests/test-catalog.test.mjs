@@ -19,6 +19,30 @@ async function fixture(t){
  const edit=async request=>{await host.editTestList(request,host.state.testList.revision,true);assert.equal(host.state.error,undefined,host.state.error)};
  return {directory,host,edit,tools:()=>({backendCalls,semanticCalls})};
 }
+test('restore-all clears exclusions in one catalog update while preserving preferences and sources',async t=>{
+ const f=await fixture(t),catalog=await readTestCatalog(f.directory);
+ await saveTestCatalog(f.directory,catalog.revision,{...catalog.policy,excluded:[{file:'tb/tb_counter_basic.sv',top:'tb_counter_basic'},{file:'tb/tb_counter_rollover.sv',top:'tb_counter_rollover'}]});
+ const before=await readTestCatalog(f.directory),toml=await fs.readFile(path.join(f.directory,'rtl.toml'));
+ await editTestCatalog(f.directory,before.revision,{action:'restore-all'});
+ const after=await readTestCatalog(f.directory);assert.deepEqual(after.policy.excluded,[]);assert.deepEqual(after.policy.folders,before.policy.folders);assert.deepEqual(after.policy.manual,before.policy.manual);
+ assert.deepEqual(await fs.readFile(path.join(f.directory,'rtl.toml')),toml);assert.deepEqual(f.tools(),{backendCalls:0,semanticCalls:0});
+ await assert.rejects(editTestCatalog(f.directory,before.revision,{action:'restore-all'}),/changed/);
+});
+test('external TB import copies separate tops without overwriting files or invoking tools',async t=>{
+ const f=await fixture(t);
+ const external=await fs.mkdtemp(path.join(root,'.dev/external-tb-'));t.after(()=>fs.rm(external,{recursive:true,force:true}));
+ const source=path.join(external,'가져온 테스트.sv'), code='module first; initial #1 $finish; endmodule\nmodule second; initial #1 $finish; endmodule\n';
+ await fs.writeFile(source,code); const settings=await fs.readFile(path.join(f.directory,'rtl.toml'));
+ await f.edit({action:'import',path:source});
+ assert.equal(await fs.readFile(source,'utf8'),code);
+ assert.equal(await fs.readFile(path.join(f.directory,'tb','가져온 테스트.sv'),'utf8'),code);
+ assert.ok(f.host.state.tests.some(item=>item.top==='first')); assert.ok(f.host.state.tests.some(item=>item.top==='second'));
+ assert.deepEqual(await fs.readFile(path.join(f.directory,'rtl.toml')),settings); assert.deepEqual(f.tools(),{backendCalls:0,semanticCalls:0});
+ await fs.writeFile(source,'module changed; endmodule');
+ await assert.rejects(editTestCatalog(f.directory,f.host.state.testList.revision,{action:'import',path:source}),/EEXIST/);
+ assert.equal(await fs.readFile(path.join(f.directory,'tb','가져온 테스트.sv'),'utf8'),code);
+ await assert.rejects(editTestCatalog(f.directory,'stale',{action:'import',path:source}),/changed/);
+});
 test('folder adds/removes separate tops without invoking tools or writing on events; exclusion survives recreation/restart',async t=>{
  const f=await fixture(t),manifest=await fs.readFile(path.join(f.directory,'rtl.toml'));
  await f.edit({action:'folder',path:'verification'});const file=path.join(f.directory,'verification/two.sv');

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { WaveformSession } from './waveform/client';
 import { loadRecordedTrace } from './core/trace';
 import type { TestResult } from './core/model';
@@ -18,23 +19,30 @@ export class WaveformHost {
     void work.then(settled, settled);
     return work;
   }
-  private async openReader(result: TestResult, signal?: AbortSignal): Promise<WaveformDocument> {
+  openFile(file: string, signal?: AbortSignal): Promise<WaveformDocument> {
+    const work = this.openReader(undefined, signal, file);
+    this.openings.add(work);
+    const settled = () => { this.openings.delete(work); };
+    void work.then(settled, settled);
+    return work;
+  }
+  private async openReader(result: TestResult | undefined, signal?: AbortSignal, file?: string): Promise<WaveformDocument> {
     signal?.throwIfAborted();
     if (this.closed || !this.workerFile) throw Error('Waveform reader is unavailable.');
     if (this.readers.size >= 4) throw Error('Close a waveform before opening another (maximum 4).');
-    if (!result.waveform?.toLowerCase().endsWith('.vcd')) throw Error('내장 파형은 현재 VCD를 지원합니다. FST 화면은 후속 단계에서 연결합니다.');
+    if (!(result?.waveform ?? file)?.toLowerCase().endsWith('.vcd')) throw Error('내장 파형은 VCD를 지원합니다. FST는 GTKWave로 열어 주세요.');
     const token = randomUUID(), reader = new WaveformSession(this.workerFile);
     const controller = new AbortController();
     this.readers.set(token, { reader, controller });
     const abort = () => { void this.close(token).catch(() => {}); };
     signal?.addEventListener('abort', abort, { once: true });
     try {
-      const trace = await loadRecordedTrace(result, controller.signal);
+      const trace = result ? await loadRecordedTrace(result, controller.signal) : undefined;
       controller.signal.throwIfAborted();
-      const verified = await reader.loadVerified(trace.bytes, trace.sha256);
+      const metadata = trace ? (await reader.loadVerified(trace.bytes, trace.sha256)).metadata : await reader.load(path.resolve(file!));
       controller.signal.throwIfAborted();
       if (this.closed || !this.readers.has(token)) throw Error('Waveform loading cancelled.');
-      return { token, runId: trace.runId, name: `${result.name} · ${trace.runId.slice(0, 8)}`, metadata: verified.metadata };
+      return { token, runId: trace?.runId ?? randomUUID(), name: result?.name ?? path.basename(file!), metadata, recorded: !!result, file: trace?.file ?? path.resolve(file!) };
     } catch (error) { await this.close(token); throw error; }
     finally { signal?.removeEventListener('abort', abort); }
   }

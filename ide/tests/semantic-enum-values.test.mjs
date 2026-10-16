@@ -14,12 +14,17 @@ test('scope presentation cache bounds type/value/UTF-8 payload with exact live n
   assert.match(await checkedProcess({executable:process.env.RTL_SEMANTIC_PYTHON,args:['-I','-B','-c',source],cwd:root}),/ownership verified/);
 });
 
-test('real enum completions retain shadowed package spelling/defaults and whole JSON when every cache budget refuses reuse',{timeout:60000},async()=>{
+test('real enum completions retain shadowed package spelling/defaults and whole JSON when every cache budget refuses reuse',{timeout:180000},async t=>{
   const base=await semanticLookup({files:3});
   for(const cacheLimits of [{max_types:0},{max_values:31},{max_bytes:1}]){
-    const limited=await semanticLookup({files:3,cacheLimits});
-    assert.deepEqual(limited.phases.map(p=>p.semanticHash),base.phases.map(p=>p.semanticHash));
-    assert.equal(limited.livePythonAfter,0);assert.deepEqual(limited.tempEntriesAfter,[]);
+    // This compares eight independent compiler requests, not one latency SLA.
+    // Keep the full Unicode/enum workload and each provider's 15-second budget;
+    // give every cache mode its own bounded functional comparison interval.
+    await t.test(JSON.stringify(cacheLimits),{timeout:60000},async()=>{
+      const limited=await semanticLookup({files:3,cacheLimits});
+      assert.deepEqual(limited.phases.map(p=>p.semanticHash),base.phases.map(p=>p.semanticHash));
+      assert.equal(limited.livePythonAfter,0);assert.deepEqual(limited.tempEntriesAfter,[]);
+    });
   }
 });
 

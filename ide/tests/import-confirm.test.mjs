@@ -31,7 +31,10 @@ test('real confirmation converts pending TOML, host registers independent file.t
   await assert.rejects(host.confirmReview(selection, false), /신뢰/);
   await host.confirmReview(selection, true); assert.equal(host.state.error, undefined);
   assert.equal(host.state.review, undefined); assert.deepEqual(host.state.tests.map(target => target.name), ['tb.first', 'tb.second']);
-  const project = await loadProject(dir); assert.equal(project.packageOrder, 'manifest');
+  // Untouched IDE-managed projects discover new packages and resolve their
+  // dependencies at execution time; the original TOML remains canonical.
+  const project = await loadProject(dir); assert.equal(project.packageOrder, 'auto');
+  assert.match(await fs.readFile(path.join(dir, 'rtl.toml'), 'utf8'), /package_order = "manifest"/);
   assert.deepEqual(project.tests.map(target => target.top), ['first', 'second']);
   const cli = spawnSync(process.execPath, [path.join(root, 'scripts/rtl.mjs'), 'check'], { cwd: dir, encoding: 'utf8' });
   assert.equal(cli.status, 0, cli.stderr); assert.deepEqual(JSON.parse(cli.stdout).tests, project.tests.map(({ name, top }) => ({ name, top })));

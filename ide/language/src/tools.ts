@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import os from 'node:os';
 import path from 'node:path';
-import { ToolSetupService, type ToolKind, type ToolSetupState } from '../../runtime/tool-setup';
+import { ToolSetupService, planToolUpdate, requireExternalTools, type ToolKind, type ToolSetupState } from '../../runtime/tool-setup';
 
 /** Product UI for an explicit, reviewable tool plan. No automatic install. */
 export function registerTools(context: vscode.ExtensionContext): () => Promise<void> {
@@ -14,22 +14,33 @@ export function registerTools(context: vscode.ExtensionContext): () => Promise<v
       try { const operation = work(); if (token.isCancellationRequested) service?.cancel(); return await operation; } finally { clearInterval(timer); subscription.dispose(); }
     });
   }
-  async function setup(kind?: ToolKind): Promise<ToolSetupState | undefined> {
+  async function setup(kind?: ToolKind, update = false): Promise<ToolSetupState | undefined> {
     if (!vscode.workspace.isTrusted) { await vscode.window.showInformationMessage('프로젝트를 신뢰한 후 도구를 설정할 수 있습니다. 기본 코드 편집은 계속 사용할 수 있습니다.'); return; }
     if (busy || disposed) { output.show(); return service?.state; }
     if (!kind) {
       const choice = await vscode.window.showQuickPick([
         { label: '시뮬레이션 도구', description: 'Verilator · C++ 빌드 도구 · GTKWave', group: 'simulation' as const },
-        { label: '언어 분석 도구', description: 'slang · 전용 Python', group: 'language' as const }
+        { label: '언어 분석 도구', description: 'slang · 전용 Python', group: 'language' as const },
+        { label: '도구 저장 위치 선택', description: '프로젝트 밖의 공유 폴더', action: 'directory' },
+        { label: '관리 시뮬레이션 도구 업데이트', description: '설치 계획 확인 후 승인', group: 'simulation' as const, action: 'update' }
       ], { title: '도구 설정', placeHolder: '기존 도구를 먼저 검증합니다.' });
-      if (!choice) return; kind = choice.group;
+      if (!choice) return;
+      if (choice.action === 'directory') {
+        const selected = await vscode.window.showOpenDialog({ title: '공유 도구 저장 위치', canSelectFiles: false, canSelectFolders: true, canSelectMany: false });
+        if (!selected?.length) return;
+        if (selected[0].scheme !== 'file') throw Error('로컬 폴더를 선택해 주세요.');
+        await requireExternalTools(selected[0].fsPath, (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath));
+        await vscode.workspace.getConfiguration('rtl').update('toolsDirectory', selected[0].fsPath, vscode.ConfigurationTarget.Global);
+        return setup();
+      }
+      kind = choice.group; update = choice.action === 'update';
     }
     if (busy || disposed) return service?.state;
     busy = true;
     try {
       const home = path.resolve(vscode.workspace.getConfiguration('rtl').get<string>('toolsDirectory') || process.env.RTL_DEV_HOME || path.join(os.homedir(), '.rtl-dev'));
       const projects = (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath);
-      service = new ToolSetupService(home, projects, undefined, state => { if (!disposed) output.replace(state.log + (state.error ? '\n' + state.error : '')); });
+      service = new ToolSetupService(home, projects, update ? planToolUpdate : undefined, state => { if (!disposed) output.replace(state.log + (state.error ? '\n' + state.error : '')); });
       for (;;) {
         let result = await progress(() => service!.prepare(kind!, vscode.workspace.isTrusted));
         if (disposed) { service.cancel(); return service.state; }

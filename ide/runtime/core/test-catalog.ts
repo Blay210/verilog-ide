@@ -20,7 +20,7 @@ const role = z.object({ path: z.string().max(4096), role: z.enum(['source', 'sim
 const identity = z.object({ file: relative, top: z.string().regex(/^[A-Za-z_][A-Za-z0-9_$]*$/), name: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/).optional() }).strict();
 const schema = z.object({ version: z.literal(1), folders: z.array(role).max(1000), files: z.array(role).max(1000), manual: z.array(relative).max(1000), excluded: z.array(identity).max(10000) }).strict();
 export type TestCatalogPolicy = z.infer<typeof schema>;
-export type TestCatalogEdit = { action: 'folder'; path: string } | { action: 'file'; path: string } | { action: 'exclude'; file: string; top: string; name?: string } | { action: 'restore'; file: string; top: string; name?: string };
+export type TestCatalogEdit = { action: 'folder'; path: string } | { action: 'file'; path: string } | { action: 'import'; path: string } | { action: 'exclude'; file: string; top: string; name?: string } | { action: 'restore'; file: string; top: string; name?: string } | { action: 'restore-all' };
 export interface CatalogTest { name: string; top: string; sources: (string | { file: string })[]; tags: string[]; timeout_ms?: number }
 export interface TestCatalog {
   policy: TestCatalogPolicy; revision: string; enabled: boolean;
@@ -55,9 +55,12 @@ async function readDocument(root: string): Promise<string | undefined> {
 export async function readTestCatalog(directory: string, manifestText?: string): Promise<TestCatalog> {
   const root = await safeRoot(directory);
   const text = await readDocument(root);
-  const policy = text === undefined ? defaults(manifestText ?? await readFile(path.join(root, 'rtl.toml'), 'utf8').catch(error => { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return ''; throw error; })) : validatedPolicy(JSON.parse(text));
+  const manifest = manifestText ?? await readFile(path.join(root, 'rtl.toml'), 'utf8').catch(error => { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return ''; throw error; });
+  const policy = text === undefined ? defaults(manifest) : validatedPolicy(JSON.parse(text));
   policy.folders = validatedImportRoles(policy.folders); policy.files = validatedImportRoles(policy.files);
-  return { policy, revision: text === undefined ? 'absent' : hash(text), enabled: text !== undefined || policy.folders.some(item => item.role === 'simulation') || policy.files.some(item => item.role === 'simulation') };
+  let managed = false;
+  try { managed = !!parseImportedExecution(root, manifest); } catch { /* Never adopt a changed/user document. */ }
+  return { policy, revision: text === undefined ? 'absent' : hash(text), enabled: managed || text !== undefined || policy.folders.some(item => item.role === 'simulation') || policy.files.some(item => item.role === 'simulation') };
 }
 function roleFor(file: string, rules: FolderRole[]) {
   return rules.filter(rule => !rule.path || key(file).startsWith(key(rule.path) + '/')).sort((a, b) => b.path.length - a.path.length)[0]?.role;
@@ -94,6 +97,9 @@ function automaticName(top: TopCandidate) {
   const readable = `${path.posix.basename(top.file, path.posix.extname(top.file)).toLowerCase()}.${top.top}`;
   const suffix = hash(catalogKey(top.file, top.top)).slice(0, 12);
   return /^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(readable) ? `${readable}-${suffix}` : `tb-${suffix}`;
+}
+export function catalogDisplayName(name: string, file: string, top: string): string {
+  return name === automaticName({ file, top } as TopCandidate) ? `${path.posix.basename(file, path.posix.extname(file))}.${top}` : name;
 }
 export async function resolveCatalogTests(root: string, text: string, tests: CatalogTest[], signal?: AbortSignal) {
   const catalog = await readTestCatalog(root, text);
@@ -133,9 +139,32 @@ export async function saveTestCatalog(directory: string, revision: string, polic
   return readTestCatalog(root);
 }
 export async function editTestCatalog(root: string, revision: string, edit: TestCatalogEdit, signal?: AbortSignal) {
-  if (!edit || !['folder', 'file', 'exclude', 'restore'].includes(edit.action)) throw Error('Unknown TB selection operation.');
+  if (!edit || !['folder', 'file', 'import', 'exclude', 'restore', 'restore-all'].includes(edit.action)) throw Error('Unknown TB selection operation.');
   const current = await readTestCatalog(root), policy = current.policy;
   if (current.revision !== revision) throw Error('TB selection changed. Refresh before applying your change.');
+  if (edit.action === 'restore-all') { policy.excluded = []; return saveTestCatalog(root, revision, policy, signal); }
+  if (edit.action === 'import') {
+    signal?.throwIfAborted();
+    const projectRoot = await safeRoot(root), source = path.resolve(edit.path);
+    if (!path.isAbsolute(edit.path) || !/\.(v|sv)$/i.test(source)) throw Error('가져올 Verilog/SystemVerilog 파일을 선택해 주세요.');
+    const info = await lstat(source);
+    if (!info.isFile() || info.isSymbolicLink() || key(await realpath(source)) !== key(source) || info.size > 8 * 1024 * 1024) throw Error('링크가 아닌 8 MiB 이하의 TB 코드 파일을 선택해 주세요.');
+    const folder = relative.parse(policy.folders.find(item => item.role === 'simulation' && item.path)?.path ?? 'tb');
+    let directory = projectRoot;
+    for (const segment of folder.split('/')) {
+      directory = path.join(directory, segment); await mkdir(directory).catch(error => { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; });
+      const stat = await lstat(directory);
+      if (!stat.isDirectory() || stat.isSymbolicLink() || key(await realpath(directory)) !== key(directory)) throw Error('TB 대상 폴더에 링크를 사용할 수 없습니다.');
+    }
+    const location = relative.parse(`${folder}/${path.basename(source)}`), destination = path.join(projectRoot, ...location.split('/'));
+    const bytes = await readFile(source); signal?.throwIfAborted();
+    if (bytes.length > 8 * 1024 * 1024 || key(await realpath(source)) !== key(source)) throw Error('가져오는 동안 원본 파일이 바뀌었습니다.');
+    const handle = await open(destination, 'wx');
+    try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
+    // A cancelled/conflicting registration leaves the copied source for review.
+    // Never remove user-visible RTL as recovery or overwrite a same-name file.
+    return editTestCatalog(projectRoot, revision, { action: 'file', path: location }, signal);
+  }
   if (edit.action === 'folder' || edit.action === 'file') {
     const location = relative.parse(edit.path), resolved = path.join(root, ...location.split('/'));
     let parent = path.resolve(root);

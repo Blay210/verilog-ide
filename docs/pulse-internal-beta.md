@@ -1,5 +1,7 @@
 # Pulse Windows 내부 베타 전달 기록 (2026-10-14 KST)
 
+> 후속: [2026-10-16 Pulse (beta) Setup 전달](pulse-beta-20261016.md)가 최신이다. 현재 앱·제품 정리를 반영한 새 Setup을 생성했으며 과거 화면 수용을 최신 패키지에 복사하지 않는다. 아래 ZIP/Setup 파일과 수용은 2026-10-14 당시 기록이다.
+
 사용자가 남은 검증·화면 검증·빌드·배포 준비를 승인했다. 스터디 내부 Windows x64 무설치 ZIP을 준비하며, 공개 업로드/설치/안정판 수용과 구분한다. 이번 요청은 최종 한 화면 세션에 대한 명시적 승인이다. 이후 새 Computer Use 세션도 사용자 확인을 받아 진행한다.
 
 후속 요청으로 **Setup 설치판도 생성 완료**했다: `ide/release/Pulse-Setup-windows-x64-beta-20261014.exe`(260,255,047 bytes)·SHA256·installer-manifest. 기존 ZIP/app은 변경하지 않았고 compiler/PE/2,565 staged hash 및 신규3개 payload 회귀 PASS다. 실제 설치·제거·마법사 화면/clean Windows 수용은 미실시다. [설치 방식·근거·인수인계](pulse-windows-installer.md). 아래 ZIP 작업 당시 ‘설치 프로그램 없음’ 기록은 이 후속 작업 전 상태다.

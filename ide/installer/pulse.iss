@@ -1,4 +1,4 @@
-; Pulse study beta. Compile only through scripts/build-installer.mjs.
+; Pulse beta. Compile only through scripts/build-installer.mjs.
 #ifndef PayloadDir
   #error PayloadDir is required
 #endif
@@ -8,12 +8,21 @@
 #ifndef UserAppId
   #error UserAppId is required
 #endif
+#ifndef ProductVersion
+  #error ProductVersion is required
+#endif
+#ifndef WindowsVersion
+  #error WindowsVersion is required
+#endif
+#ifndef SetupBaseName
+  #error SetupBaseName is required
+#endif
 
 [Setup]
 AppId={#UserAppId}
 AppName=Pulse
-AppVersion=0.1.0-beta.20261014
-AppVerName=Pulse Study Beta (2026-10-14)
+AppVersion={#ProductVersion}
+AppVerName=Pulse (beta)
 AppPublisher=Pulse Project
 DefaultDirName={localappdata}\Programs\Pulse
 DefaultGroupName=Pulse
@@ -25,14 +34,14 @@ MinVersion=10.0
 WizardStyle=modern
 SetupIconFile={#PayloadDir}\resources\app\resources\win32\code.ico
 UninstallDisplayIcon={app}\Pulse.exe
-UninstallDisplayName=Pulse (Study Beta)
+UninstallDisplayName=Pulse (beta)
 AppMutex=rtl-ide
 CloseApplications=no
 RestartApplications=no
 LicenseFile={#PayloadDir}\resources\app\LICENSE.txt
 OutputDir={#OutputDir}
-OutputBaseFilename=Pulse-Setup-windows-x64-beta-20261014
-VersionInfoVersion=0.1.2026.1014
+OutputBaseFilename={#SetupBaseName}
+VersionInfoVersion={#WindowsVersion}
 Compression=lzma2/normal
 SolidCompression=yes
 DiskSpanning=no

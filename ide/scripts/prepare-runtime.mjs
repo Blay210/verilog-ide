@@ -23,6 +23,9 @@ export async function prepareRuntime(source = path.join(root, 'upstream'), optio
     platform: 'node', format: 'esm', target: 'node22', legalComments: 'inline',
     banner: { js: marker + '\nimport { createRequire as rtlCreateRequire } from "node:module"; const require = rtlCreateRequire(import.meta.url);' }
   });
+  const cli = path.join(directory, 'rtl-cli.cjs');
+  if (fs.existsSync(cli) && (!inside(source, fs.realpathSync(cli)) || !fs.readFileSync(cli, 'utf8').startsWith(marker))) throw Error('Unmanaged RTL CLI target; refusing overwrite.');
+  await build({ entryPoints: [path.join(root, 'runtime/cli-entry.ts')], outfile: cli, bundle: true, platform: 'node', format: 'cjs', target: 'node22', legalComments: 'inline', banner: { js: marker } });
   const worker = path.join(directory, 'waveform-worker.cjs'), htmlFile = path.join(directory, 'waveform.html');
   for (const file of [worker, htmlFile]) {
     if (fs.existsSync(file) && (!inside(source, fs.realpathSync(file)) || !fs.readFileSync(file, 'utf8').startsWith(file === htmlFile ? `<!--${marker}-->` : marker))) throw Error('Unmanaged waveform target; refusing overwrite.');
@@ -37,7 +40,7 @@ export async function prepareRuntime(source = path.join(root, 'upstream'), optio
   const nonce = randomBytes(18).toString('base64');
   let html = waveformHtml('RTL_SCRIPT', 'RTL_CSS', "'unsafe-inline'", nonce);
   const script = (bridge.outputFiles[0].text + '\n' + client.outputFiles[0].text).replace(/<\/script/gi, '<\\/script');
-  const css = fs.readFileSync(path.join(root, 'waveform-ui/waveform.css'), 'utf8') + '\n#external{display:none}';
+  const css = fs.readFileSync(path.join(root, 'waveform-ui/waveform.css'), 'utf8');
   html = html.replace('<link rel="stylesheet" href="RTL_CSS">', `<style>${css}</style>`)
     .replace(`<script nonce="${nonce}" src="RTL_SCRIPT"></script>`, `<script nonce="${nonce}">${script}</script>`);
   // Leading comment identifies our generated asset without permitting arbitrary file reads.

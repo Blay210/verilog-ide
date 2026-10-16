@@ -1,3 +1,55 @@
+## 최신: Pulse (beta) Setup 생성 완료 (2026-10-16)
+
+최신 앱에서 검증 전용 DOM/강제 클릭 명령·계측/개발 확장을 제외하고 Setup을 생성했다. 전체436건:435 PASS/0 FAIL/0 CANCEL/1 POSIX SKIP, 본체 타입0 errors, 앱2,558파일/native integrity10개·payload2,563개·라이선스30개·Inno6.4.1 exit0·최종 EXE/SHA256 대조 PASS다. `ide/release/Pulse-Setup-windows-x64-beta-20261016.exe`(260,697,847 bytes), 제어판 이름 Pulse (beta)·기존 제품 identity/경로 유지. `Start-Pulse.cmd`도 최신 후보를 선택했다. [산출물·해시·실패 보완·정확한 검증 범위·다음 작업](pulse-beta-20261016.md)가 기준이다. 실제 설치/upgrade/uninstall·새 화면/clean Windows는 미검증이며 사전 승인 없이 진행하지 않는다. 이전 artifact/사용자 창·신뢰·프로필은 보존했고 업로드/공개 게시 없음. H7 성능/대표 설계·후속 diagram/엔진 잔여는 유지한다.
+
+## H7 프로젝트 모듈 이름 추천 보완 (2026-10-16)
+
+위치별 query cache에 없던 새 `coun` 입력에서 `counter`가 빠지는 문제를 root별 정의 이름 catalogue로 보완했다. module item/generate 위치·Class/snippet·rename/삭제/외부 무효화·bounded memory를 유지한다. [구현·최종 검증·현재 실행](pulse-module-catalog-completion.md)을 우선 읽는다. 다음 사용자 직접 체험이며 새 화면/설치·배포 없음.
+
+## H7 편집 연속성 보완 (2026-10-16)
+
+module 색상·기존 instance 포트·동일 qualifier/identifier 후보를 표시 snapshot으로 유지하고 새 분석으로 교체한다. 정확한 hover/진단/이동 gate·stale generation 차단·bounded memory·외부/설정 무효화는 유지한다. 전체420 PASS/1 POSIX SKIP·최종 관련40 PASS·language build0. 다음 최신 로컬 실행본 사용자 체험→필요 시 승인 화면 확인. 첫 새 lookup/부분 compiler 증분·실제 UI 수용은 잔여. [공식 조사·검증·실행](pulse-semantic-continuity.md). 새 화면/설치·배포 없음.
+
+## 자동 추천 표시·패키지 namespace 보완 (2026-10-15)
+
+사용자 Ctrl+Space 의존 증상에서 빈 첫 결과 뒤 visible-widget만 갱신한 경로, snippet 중 quick suggest 차단 기본값, 일반 lookup에서 누락된 unimported package 이름을 확인했다. 실제 native pending typing intent(10초, Esc/이동/포커스/Code 전환 보호)·RTL 자동 추천 설정·project package 명시 열거·LSP 전체 후보 pool/로컬 필터를 연결했다. 패키지·bare-dot 미완성 포트의 actual compiler/LSP PASS. 전체413건412 PASS/0 FAIL/1 POSIX SKIP, 이후 expiry/native/restore 관련15 PASS(합산 금지)·runtime/language build0·최종 전체 본체 타입/emission0 errors. 최초 실패는 fixture의 native helper 누락/callback binding을 보완하고 전체 재실행했다.
+
+최신 실행은 `ide/Start-Pulse.cmd`와 `.dev/latest-launch.json`을 기준으로 하며, 아래의 고정 후보 경로/이미 열린 목록만 갱신 설명은 이전 단계다. UI/Computer Use·Setup 실행 없음. 최초 정밀 분석 시간·부분 compiler 증분은 별도 잔여이고 새 자동 popup은 사용자 직접 체험 대상으로 남긴다. [원인·동작·검증·현재 실행](pulse-automatic-completion.md).
+
+## 모듈 자동완성 입력 위치 보완 (2026-10-15)
+
+사용자가 속도 개선 체감을 확인했다. 모듈 추천의 `instance_name` 문구를 제거하고 빈 인스턴스 이름 위치→Tab→포트 괄호 안의 순서를 유지했다. language build0·관련5 PASS·실제 Code-OSS snippet parser 빈 위치/순서 PASS. 새 화면은 열지 않았다. 언어 bundle만 갱신한 별도 로컬 앱의 파일/무결성·CLI·최신 실행 경로 검사를 마쳤으며, 최신 경로는 `ide/.dev/latest-launch.json`/`ide/Start-Pulse.cmd`를 기준으로 한다. 아래 고정된 이전 후보 경로는 과거 이력이다. [현재 수정·검증·실행 안내](pulse-performance-final.md).
+
+## H7 첫 추천·초기 화면 보완과 최신 실행본 준비 (2026-10-15)
+
+첫 query의 중복 실경로·전체 파일 좌표 변환·native scope 접근과 root module 이름 조회를 줄였다. 과도한 owning-instance 후보 분류는 계측상 악화해 제거했다. Simulation provider/Explorer는 유지하고 버튼·설정 DOM은 첫 진입으로 미뤘다. 전체406건405 PASS/0 FAIL/1 POSIX SKIP, 이후 resource/launch/overlay 관련8 PASS(합산 금지)·runtime/language build0·전체 native 타입/emission0 errors·compiled 정책 PASS. Windows 합성200파일의 첫 정밀 조회109~205ms·반복 중앙값2.95ms이며 실제 UI 수치는 아니다.
+
+공식25 bundle·2,564파일 inventory·10 integrity·headless native/RTL CLI 두 top 검사 PASS. 최신 `ide/Start-Pulse.cmd`는 별도 `.dev/pulse-bundled-9G7Hqv`의 built 앱을 실행한다. 개발 소스 인자/VSCODE_DEV 없이 고유 native cache key와 기존 전용 프로필을 사용한다. 기존 Pulse 창을 정상 종료하고 실행한다. GUI/Computer Use/Setup 실행 없음. 다음은 사용자 직접 체험→문제 보완/필요 시 승인된 통합 화면 확인→사용자 요청 후 Setup이다. 부분 compiler 증분·최초 AST 준비·저장 watcher 중복·대표 실제 설계/Windows UI 성능은 잔여다. 아래의 E1/첫 query/startup 미구현 설명은 이전 기록이다.
+
+[현재 코드·계측·실패 복구·최신 실행·잔여 검증](pulse-performance-final.md)를 우선 읽는다.
+
+## H7 변경 후 compiler worker 재사용 적용 — 비화면 검증 완료 (2026-10-15)
+
+source 편집 후 동일 worker에서 이전 모델/캐시를 해제하고 새 독립 compilation을 준비한다. id/revision·query별 soft cancel/15초 deadline·32슬롯·root hard cleanup·준비 중 open 정리 합류·64회 rebuild 후 교체를 연결했다. 최종 전체401건400 PASS/0 FAIL/1 POSIX SKIP·언어 build0·guarded overlay/compiled 정책/diff·9자산 launcher 준비/검사 PASS. Windows200개 작은 RTL의 모델 준비 중앙값은 새 worker502ms/재사용333ms였으며 첫 정밀 조회190~262ms는 남았다. 다음은 첫 정밀 조회 비용 분해/E2·E4 및 startup S1/S2다. 부분 compiler 증분/최초 정밀 조회/앱 startup·실제 UI 수용은 잔여다. [현재 계약·측정·검증·다음 순서](pulse-worker-rebuild.md)를 우선 읽는다. 화면/앱/Setup 실행 없음. 아래의 변경마다 worker 재사용이 미구현이라는 설명은 이전 기록이다.
+
+## H7 편집 추천/분석 예약 분리 적용 — 비화면 검증 완료 (2026-10-15)
+
+입력 중 추천 요청이 전체 분석을 앞당기거나 기다리는 경로를 built-in에서 분리했다. 일반400ms/구문 완료120ms debounce·최신 작업 하나·구 generation 게시 차단·이미 열린 suggest만 file/version/caret/focus 재검사 후 갱신을 연결했다. 최종 전체391건390 PASS/0 FAIL/1 POSIX SKIP·언어 build0·전체 native 타입/emission0 errors·compiled 정책/diff PASS,9자산 최신 launcher prepare/check 완료. 다음 구현은 같은 worker의 변경 후 rebuild와 최신 후보 준비 비용 감소이며 startup S1/S2도 잔여다. 부분 compiler 증분/같은 worker의 변경 후 rebuild·앱 cold startup 최적화·화면 수용은 아직 미완료다. 화면/앱/Setup 실행 없음. [현재 계약·검증·실패 복구·다음 순서](pulse-edit-scheduling.md)를 우선 읽는다. 아래의 모든 요청이 분석을 기다린다는 설명은 이전 기록이다.
+
+## H7 프로젝트 진입·자동완성 재사용 보완 완료 — 비화면 기준 (2026-10-15)
+
+빈 창의 별도 Ready 프로젝트 시작·Code/Simulation 전환 차단·최근 프로젝트/X·프로젝트 전환 전 native layout 복구를 연결했다. 사용자 새 정책: 실행 중 공간 왕복은 보존하되 종료 후 Pulse 공간/파형 탭/커서를 자동 복원하지 않는다. 최근/이력·보관 소스/trace·미저장 복구는 보존한다. 신호/모듈 아이콘·module/port snippet·RTL 색상/Emmet 억제와 EOF 단일 module에서 wire/reg/logic 후보가 빠지는 compiler scope 충돌을 보완했다.
+
+편집 후 generation별 compiler 모델/source manager·범위 인덱스·선언 경계/qualifier별 후보를 메모리에 유지하고 실제 built-in 언어 클라이언트에서 조회한다. 파일/설정/watch/root 변경 시 폐기·확인 후 갱신, 취소/종료는 실제 leaf exit를 확인한다.2 retained worker·4 context·source32MiB/관측 RSS512MiB·scope cache128/8MiB·120초 유휴 해제이며 비지원/한도 초과는 기존 compiler 경로다. **compiler 자체의 변경 부분만 재분석하는 증분 구현은 아니다.** 최초/변경 직후 분석 대기·native static imports/개발 본체 cold startup은 잔여다.
+
+최종 전체379건은378 PASS/0 FAIL/1 POSIX SKIP. 이후 EOF/별칭 경계 보완의 최신 관련56건55 PASS/0 FAIL/1 POSIX SKIP·retained multi-root 별도1 PASS(합산 금지). runtime/language build0·전체 본체 타입/owned emission0 errors·compiled 정책/script syntax/diff PASS.200파일 Windows 합성 API: 모델619ms/최초 조회360ms/반복 중앙값3.16ms, 기존 새 분석 경로941~1419ms·관측 RSS약38MiB. 실제 editor UI/전체 앱 startup 수용 수치가 아니다. 계측 fixture의 고정된 함수 hook22건 실패와 복구, UTF-8/한글 경로 및 EOF 원인도 기록했다.
+
+최신 개발 실행은 ide/Start-Pulse.cmd; 새9자산 launcher 준비/검사 완료. **이번 화면/Computer Use·Setup 실행 없음.** 사용자가 직접 사용하거나 별도로 승인한 한 화면 세션에서 새 진입·native 지연·편집 추천·종료 정책·시뮬레이션을 확인한 뒤 Setup을 결정한다. 기존 Setup/ZIP은 이전 버전이다. [현재 코드·원시 근거 경로·한도·실패 복구·다음 순서](pulse-completion-performance.md)를 우선 읽는다. 아래의 재사용 미구현/종료 복원 요구는 이전 기록이다.
+
+> 2026-10-14 후속: 사용자가 baseline을 VSIX + α, 제외를 Diagram만으로 지정했다. [VSIX 실제 기능 직접 대조](pulse-vsix-parity-audit.md)가 27개 비Diagram command·설정/키·CLI·진입 연결을 확인한 최신 이식 판정이다. 이전 첫 앱 축소 범위/일반 요구 감사와 구분하며 F5·생성·CLI·parallel/tag·GTKWave 등은 실제 baseline gap으로 관리한다.
+
+> 2026-10-14 독립 앱 상태 재감사: [Pulse 현재 요구·구현 감사](pulse-current-product-audit.md)를 우선 참고한다. 아래 VSIX 기능표/이전 H 단계 상태에는 독립 앱 이전 또는 중간 구현 기록이 포함된다. 새 프로젝트/초기 가져오기 UX·FST/enum 실제 연결·재시작·배포 CLI를 기존 helper/검증 프로젝트 실행 완료로 계산하지 않는다. 이번은 감사/문서 정리이며 기능 수정은 시작하지 않았다.
+
 ## H7S 최신 — enum 표시 정보 재사용·lookup/요청 대기 구분 (2026-10-13 UTC)
 
 기존 pyslang의 동일 native enum identity/고정 lookup scope에서 해석한 표시 값·spelling을 요청 안에서만 재사용한다(최대64 types/4096 values/1MiB UTF-8 payload, 상한 거절 시 원래 계산·각 output 별도 복사). native lookup·default/decl order·shadowing·parameterization·Core/journal·신뢰/미저장/파일/실제 cleanup 보호를 유지하며 자체 compiler/simulator·상시 worker/settled cache는 추가하지 않았다. dense enum32/variables96의 실제 lookup9332→950/두 contexts·전후5회 전체 semantic/hierarchy30쌍 JSON 일치, unqualified 완성 중앙값1405.0→642.6ms·해당 Python peak55.6→41.4MiB를 확인했다. 일반 IPC 편집→완성949.5→979.4ms는 개선 미확인이다. snapshot 현재 분석403.7ms/query active561.8ms와 pool queue 약0.1ms를 구분했고, 제어된100ms hold의 실제 queue/종료/third start도 검증했다. 전체 앱/RSS/Windows 수용으로 일반화하지 않는다. Linux 전체 **322 PASS/0 FAIL/1 Windows batch SKIP(총323개)**·신규6 PASS·runtime/language build. 모든 상한 fallback·native identity/owned output·257/unknown enum 미표시·다른 parameterization ambiguity와 다음 편집 fresh 복구를 통과했다. 다음은 Windows 통합 검증 준비: P0 공식 본체/NTFS/취소·종료→P1 native watcher/한 번의 화면 통합·실제 대표 baseline 순서다. default/candidate/포화 queue·장시간/RSS·전체 disk·미구현 내부 연산/FST/파형 enum 등은 잔여이고 화면은 마지막 통합까지 보류한다. [구현·전후 계측·검증](ide-h7s-lookup-wait.md)·[통합 검증 우선순위](ide-h7-integration-gates.md). H7/베타/배포 전체 완료는 아니며 아래는 역사다.

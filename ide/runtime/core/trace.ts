@@ -63,3 +63,14 @@ export async function loadRecordedTrace(result:TestResult,signal?:AbortSignal) {
   if(observed.sha256!==identity.sha256 || observed.bytes!==identity.bytes)throw Error('Recorded waveform content was modified.');
   return {runId:saved.runId,inputFingerprint:identity.inputFingerprint,file,sha256:identity.sha256,bytes:observed.content!};
 }
+/** External readers need provenance verification, not an in-memory parser copy. */
+export async function verifyRecordedTrace(result:TestResult,signal?:AbortSignal) {
+  const parsed=parseTraceIdentity(result.traceIdentity);
+  if(parsed?.state!=='ready')throw Error(parsed?.reason??'No recorded trace identity.');
+  const identity=ready.parse(parsed),saved=await loadRecordedInputs(result,signal);
+  if(identity.runId!==saved.runId || identity.inputFingerprint!==saved.identity.fingerprint)throw Error('Trace/source run identity mismatch.');
+  if(saved.project.waveform!==identity.format || !identity.file.endsWith('.'+identity.format))throw Error('Trace format mismatch.');
+  const file=fileFor(result,identity.file),observed=await artifact(file,128*1024*1024,false,signal);
+  if(observed.sha256!==identity.sha256 || observed.bytes!==identity.bytes)throw Error('Recorded waveform content was modified.');
+  return {file,runId:saved.runId,sha256:observed.sha256,bytes:observed.bytes};
+}

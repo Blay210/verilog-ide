@@ -12,7 +12,7 @@ export interface Analysis { modules: ModuleInfo[]; instances: InstanceInfo[]; di
 export interface DocumentOverlay { file: string; text: string }
 export interface SemanticQuery { file: string; offset: number; qualifier?: string }
 export interface CallableInfo { kind: string; returnType: string; arguments: { name: string; label: string }[] }
-export interface SemanticSymbol { name: string; kind: 'variable' | 'constant' | 'type' | 'function' | 'module' | 'package'; detail: string; location: SourcePoint; callable?: CallableInfo; signalType?: SignalType; enumValues?: { name: string; value: string }[] }
+export interface SemanticSymbol { name: string; kind: 'variable' | 'constant' | 'type' | 'function' | 'module' | 'package'; detail: string; location: SourcePoint; /** A module definition, not an existing instance name. */ instantiable?: boolean; callable?: CallableInfo; signalType?: SignalType; enumValues?: { name: string; value: string }[] }
 export interface ParameterValue { name: string; value: string; overridden: boolean; local: boolean; location: SourcePoint }
 export interface PortBinding extends Port {
   /** Compiler declaration identity inside this instance; unrelated to its parent binding. */

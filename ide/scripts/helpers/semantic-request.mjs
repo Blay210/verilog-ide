@@ -33,8 +33,9 @@ export async function requestFixture({ files = 300, baseline = false, holdSecond
   const bridgeSource=path.join(root,'language/python/analyze.py');
   const bridgeEntry=bridgeBaseline?path.join(root,typeof bridgeBaseline==='string'?bridgeBaseline:'.dev/cloud/h7p/analyze-before.py'):bridgeSource;
   let source=await fs.readFile(bridgeEntry,'utf8');
+  const analyzeSignature=source.includes('def analyze(request, retained=None):')?'def analyze(request, retained=None):':'def analyze(request):';
   const edits=[
-    ['def analyze(request):','def analyze(request):\n    _phase("input-read")'],
+    [analyzeSignature,analyzeSignature+'\n    _phase("input-read")'],
     ['    tree = slang.syntax.SyntaxTree.fromBuffers','    _phase("parse")\n    tree = slang.syntax.SyntaxTree.fromBuffers'],
     ["    if request.get('operation') == 'dependencies':","    _phase(\"dependency\" if request.get('operation') == 'dependencies' else \"selected-elaboration\")\n    if request.get('operation') == 'dependencies':"],
     ['    root.visit(visit)','    _phase("selected-traversal-diagnostics")\n    root.visit(visit)'],
@@ -44,7 +45,9 @@ export async function requestFixture({ files = 300, baseline = false, holdSecond
   ];
   for(const [needle,replacement]of edits){assert.equal(source.split(needle).length,2,`Profile boundary changed: ${needle}`);source=source.replace(needle,replacement);}
   if(source.includes("channel['graph']")){
-    for(const [needle,replacement]of [["        with open(channel['graph'] + '.tmp'","        _phase('package-graph-write')\n        with open(channel['graph'] + '.tmp'"],["        deadline = time.monotonic() + 15","        _phase('package-core-wait')\n        deadline = time.monotonic() + 15"],["        with open(channel['continue'],","        _phase('package-continue-read')\n        with open(channel['continue'],"]]){assert.equal(source.split(needle).length,2);source=source.replace(needle,replacement);}
+    const approval="        continuation = read_package_approval(channel['continue'])";
+    const waits=source.includes(approval)?[[approval,"        _phase('package-core-wait')\n"+approval+"\n        _phase('package-continue-read')"]]:[["        deadline = time.monotonic() + 15","        _phase('package-core-wait')\n        deadline = time.monotonic() + 15"],["        with open(channel['continue'],","        _phase('package-continue-read')\n        with open(channel['continue'],"]];
+    for(const [needle,replacement]of [["        with open(channel['graph'] + '.tmp'","        _phase('package-graph-write')\n        with open(channel['graph'] + '.tmp'"],...waits]){assert.equal(source.split(needle).length,2);source=source.replace(needle,replacement);}
   }
   const instrumented=path.join(directory,'instrumented.py');await fs.writeFile(instrumented,source);
   const bridge=path.join(directory,'bridge.py');
@@ -55,7 +58,10 @@ export async function requestFixture({ files = 300, baseline = false, holdSecond
   }
   if(completionProfile){assert.ok(source.includes('scope.lookupName('));source=source.replaceAll('scope.lookupName(','_measured_lookup(scope,');}
   if(completionStages){
-    for(const [needle,name]of [["    filename = canonical(query['file'])",'completion-membership'],['    compilation.getRoot().visit(collect)','completion-candidate-scopes'],["\n    for package in compilation.getPackages():",'completion-package-names'],['    smallest = min(size for size, _ in scopes)','completion-lookup-enum'],['    visible = [value for name, value in results[0].items()','completion-agreement-definitions']]){
+    const membershipBoundary=source.includes("    filename = os.path.normcase(os.path.realpath(query['file']))")?"    filename = os.path.normcase(os.path.realpath(query['file']))":"    filename = canonical(query['file'])";
+    const scopeBoundary=source.includes("    primary_names, primary_ranges = inventory(compilation, 'primary')")?"    primary_names, primary_ranges = inventory(compilation, 'primary')":'    compilation.getRoot().visit(collect)';
+    const packageBoundary=source.includes("    if 'package_names' not in index:")?"    if 'package_names' not in index:":"\n    for package in compilation.getPackages():";
+    for(const [needle,name]of [[membershipBoundary,'completion-membership'],[scopeBoundary,'completion-candidate-scopes'],[packageBoundary,'completion-package-names'],['    smallest = min(size for size, _ in scopes)','completion-lookup-enum'],['    visible = [value for name, value in results[0].items()','completion-agreement-definitions']]){
       assert.equal(source.split(needle).length,2);const prefix=needle.startsWith('\n')?'\n':'';source=source.replace(needle,prefix+`    _phase(${JSON.stringify(name)})\n`+needle.trimStart().padStart(needle.trimStart().length+4,' '));
     }
     await fs.writeFile(instrumented,source);

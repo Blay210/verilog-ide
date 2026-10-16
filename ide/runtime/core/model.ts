@@ -8,7 +8,7 @@ export interface Project {
 }
 export interface ProcessSpec { executable: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv; /** Explicitly owned leaf processes only; builds/simulators default to tree cleanup. */ termination?: 'process' | 'tree' }
 export interface ProcessResult { code: number | null; output: string; cancelled: boolean }
-export interface OperationContext { signal?: AbortSignal; onLog?: (text: string) => void }
+export interface OperationContext { signal?: AbortSignal; onLog?: (text: string) => void; /** Owned interactive protocols only; the runner still owns cancellation and exit. */ onStdin?: (input: import('node:stream').Writable) => void }
 /** Immutable UTF-8 editor content captured when execution is requested. Existing RTL files only. */
 export interface InputOverride { path: string; text: string; version?: number }
 export interface ToolCommand { executable: string; args: string[]; env: NodeJS.ProcessEnv }

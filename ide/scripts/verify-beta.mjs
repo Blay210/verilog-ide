@@ -29,7 +29,7 @@ try {
     'resources/app/out/main.js', 'resources/app/out/mainImpl.js', 'resources/app/out/media/code-icon.svg',
     'resources/app/out/vs/code/electron-utility/sharedProcess/sharedProcessMain.js',
     'resources/app/out/vs/workbench/workbench.desktop.main.js',
-    'resources/app/out/vs/platform/rtl/node/analyze.py',
+    'resources/app/out/vs/platform/rtl/node/analyze.py', 'resources/app/out/vs/platform/rtl/node/rtl-cli.cjs', 'bin/pulse-rtl.cmd',
     'resources/app/out/vs/platform/rtl/node/waveform-worker.cjs',
     'resources/app/out/vs/platform/rtl/node/waveform.html',
     'resources/app/extensions/rtl-language/dist/extension.cjs',
